@@ -53,6 +53,25 @@ def test_denoising_inference_logic(monkeypatch):
     output = instance.infer(input_data)
     assert isinstance(output, list)
     assert len(output) == len(input_data)
+def test_short_audio_buffer_padding(monkeypatch):
+    """Test that short audio buffers are padded to min_input_length in process_buffer."""
+    import numpy as np
+    cls = denoiser.DenoisingInference
+    min_len = 64
+    instance = cls("mock_model.pth", min_input_length=min_len)
+    instance.loaded = True
+    # Mock model: just returns input tensor as output
+    class DummyModel:
+        def eval(self): return self
+        def __call__(self, x): return x
+    instance.model = DummyModel()
+    # Short buffer
+    short_audio = np.ones(10, dtype=np.float32)
+    output = instance.process_buffer(short_audio)
+    assert isinstance(output, np.ndarray)
+    assert len(output) == min_len
+    # The first 10 samples should match input, the rest should be padded (reflection or zeros)
+    np.testing.assert_allclose(output[:10], short_audio, rtol=1e-5)
 
 def test_error_handling_model_not_found(monkeypatch):
     """Test error handling for model not found (mocked)."""

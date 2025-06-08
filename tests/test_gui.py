@@ -57,6 +57,59 @@ def test_device_selection(monkeypatch):
 
 def test_start_stop_logic(monkeypatch):
     """Test start/stop logic (mocked)."""
+def test_ab_toggle_and_error_feedback(monkeypatch):
+    """Test A/B toggle (denoising on/off) and error feedback in the GUI callback."""
+    import numpy as np
+
+    class DummyAudioIO:
+        def start_stream(self, cb):
+            # Simulate 16-sample audio buffer
+            in_data = (np.ones(16, dtype=np.int16) * 1000).tobytes()
+            out = cb(in_data)
+            assert isinstance(out, bytes)
+            return True
+        def stop_stream(self): return True
+        def enumerate_devices(self): return [{"id": 0, "name": "Dummy"}]
+        def select_device(self, device_id): return True
+
+    class DummyDenoiser:
+        def __init__(self):
+            self.called = False
+            self.raise_error = False
+        def process_buffer(self, audio):
+            self.called = True
+            if self.raise_error:
+                raise RuntimeError("Mock inference error")
+            return audio * 2  # Just double the audio for test
+
+    # Instantiate app with dummy classes
+    denoiser = DummyDenoiser()
+    app = gui.DenoisingApp(DummyAudioIO(), denoiser)
+    # Simulate denoise_checkbox attribute for both real and dummy widget
+    app.denoise_checkbox.checked = True
+
+    # Patch show_error to track calls
+    errors = []
+    app.show_error = lambda msg: errors.append(msg)
+
+    # Test with denoising ON
+    def test_callback_on(in_data):
+        app.denoise_checkbox.checked = True
+        return app.start_denoising()
+    app.start_denoising()
+    assert denoiser.called
+
+    # Test with denoising OFF
+    denoiser.called = False
+    app.denoise_checkbox.checked = False
+    app.start_denoising()
+    assert not denoiser.called  # Should not call denoiser when toggle is off
+
+    # Test error feedback
+    denoiser.raise_error = True
+    app.denoise_checkbox.checked = True
+    app.start_denoising()
+    assert any("Audio processing error" in e for e in errors)
     app = gui.DenoisingApp(DummyAudioIO(), DummyDenoiser())
     # Mock start/stop methods
     app.audio_io.start_stream = lambda: True

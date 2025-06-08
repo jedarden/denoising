@@ -107,6 +107,8 @@ class DenoisingApp(_BaseMainWindow):
             self.device_label = QtWidgets.QLabel("Input Device:", self)
             self.device_combo = QtWidgets.QComboBox(self)
             self.refresh_button = QtWidgets.QPushButton("Refresh Devices", self)
+            self.denoise_checkbox = QtWidgets.QCheckBox("Denoising On", self)
+            self.denoise_checkbox.setChecked(True)
             self.start_button = QtWidgets.QPushButton("Start", self)
             self.stop_button = QtWidgets.QPushButton("Stop", self)
             self.status_label = QtWidgets.QLabel("Status: Idle", self)
@@ -114,6 +116,8 @@ class DenoisingApp(_BaseMainWindow):
             self.device_label = _DummyWidget()
             self.device_combo = _DummyWidget()
             self.refresh_button = _DummyWidget()
+            self.denoise_checkbox = _DummyWidget()
+            self.denoise_checkbox.checked = True
             self.start_button = _DummyWidget()
             self.stop_button = _DummyWidget()
             self.status_label = _DummyWidget()
@@ -136,6 +140,8 @@ class DenoisingApp(_BaseMainWindow):
             device_layout.addWidget(self.device_combo)
             device_layout.addWidget(self.refresh_button)
             layout.addLayout(device_layout)
+            # Add denoising A/B toggle
+            layout.addWidget(self.denoise_checkbox)
             layout.addWidget(self.start_button)
             layout.addWidget(self.stop_button)
             layout.addWidget(self.status_label)
@@ -188,19 +194,35 @@ class DenoisingApp(_BaseMainWindow):
         """
         Start audio I/O and denoising.
         """
-        try:
-            def callback(in_data):
-                import numpy as np
-                audio = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
-                denoised = self.denoiser.process_buffer(audio)
-                out_data = (denoised * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+        def callback(in_data):
+            import numpy as np
+            audio = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
+            try:
+                # Check toggle for A/B test
+                denoise_on = (
+                    self.denoise_checkbox.isChecked()
+                    if hasattr(self.denoise_checkbox, "isChecked")
+                    else getattr(self.denoise_checkbox, "checked", True)
+                )
+                if denoise_on:
+                    processed = self.denoiser.process_buffer(audio)
+                else:
+                    processed = audio
+                out_data = (processed * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
                 return out_data
+            except Exception as e:
+                self.show_error(f"Audio processing error: {e}")
+                # Return silence if error
+                return (np.zeros_like(audio) * 32768.0).astype(np.int16).tobytes()
 
+        try:
             if not self.audio_io.start_stream(callback):
                 self.show_error("Failed to start audio stream.")
                 self.update_status("Error: Stream not started")
             else:
-                self.update_status("Denoising started")
+                self.update_status("Denoising started (A/B toggle: {})".format(
+                    "On" if (self.denoise_checkbox.isChecked() if hasattr(self.denoise_checkbox, "isChecked") else getattr(self.denoise_checkbox, "checked", True)) else "Off"
+                ))
         except Exception as e:
             self.show_error(f"Failed to start denoising: {e}")
 

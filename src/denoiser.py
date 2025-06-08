@@ -29,12 +29,13 @@ class DenoisingInference:
     Loads and runs efficient, CPU-only denoising models (PyTorch only).
     """
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, min_input_length: int = 64):
         """
         Initialize the denoising model.
 
         Args:
             model_path (str): Path to the PyTorch model file.
+            min_input_length (int): Minimum input length required for the model (for padding).
         """
         if not isinstance(model_path, str):
             raise TypeError("model_path must be a string.")
@@ -43,6 +44,7 @@ class DenoisingInference:
         self._quantized = False
         self.device = "cpu"
         self.loaded = False
+        self.min_input_length = min_input_length
 
     def load_model(self):
         """
@@ -89,6 +91,9 @@ class DenoisingInference:
 
         Returns:
             np.ndarray: Denoised audio buffer.
+
+        Raises:
+            RuntimeError: If input is too short and cannot be padded.
         """
         if not self.loaded:
             logging.error("Model is not loaded.")
@@ -99,6 +104,18 @@ class DenoisingInference:
         if torch is None:
             logging.error("PyTorch is not installed.")
             raise ImportError("PyTorch is not installed.")
+
+        # Input validation and pre-processing for padding
+        if len(audio_buffer) < self.min_input_length:
+            # Pad using reflection if possible, else zero-pad
+            pad_len = self.min_input_length - len(audio_buffer)
+            if len(audio_buffer) > 1:
+                audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="reflect")
+            else:
+                # If only one sample, zero-pad
+                audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
+            logging.warning(f"Input audio buffer too short (len={len(audio_buffer)-pad_len}), padded to {self.min_input_length} samples.")
+
         try:
             with torch.no_grad():
                 input_tensor = torch.from_numpy(audio_buffer).float().unsqueeze(0)
@@ -106,7 +123,7 @@ class DenoisingInference:
                 return output_tensor.squeeze(0).cpu().numpy()
         except Exception as e:
             logging.error(f"PyTorch inference failed: {e}")
-            raise RuntimeError(f"PyTorch inference failed: {e}")
+            raise RuntimeError(f"PyTorch inference failed: {e} (input length: {len(audio_buffer)})")
 
     def is_quantized(self) -> bool:
         """
