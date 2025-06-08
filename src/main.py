@@ -13,15 +13,43 @@ import sys
 import os
 import argparse
 import logging
+import subprocess
+import importlib
+import traceback
 
 try:
     from PyQt5 import QtWidgets
 except ImportError:
     QtWidgets = None
 
-from src.audio_io import AudioIO
-from src.denoiser import DenoisingInference
-from src.gui import DenoisingApp
+# --- Environment Auto-Fix: ONNX Runtime ---
+def ensure_onnxruntime():
+    try:
+        import onnxruntime
+        logging.info("ONNX Runtime is available.")
+        return True
+    except ImportError:
+        logging.warning("ONNX Runtime not found. Attempting to install via pip...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "onnxruntime"])
+            importlib.invalidate_caches()
+            import onnxruntime
+            logging.info("ONNX Runtime installed successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to install ONNX Runtime: {e}")
+            return False
+
+# --- Environment Auto-Fix: VirtualMicrophoneService dependencies ---
+def ensure_virtual_microphone_deps():
+    # This can be extended for platform-specific checks
+    # For now, just a placeholder for future dependency checks
+    return True
+
+from audio_io import AudioIO
+from denoiser import DenoisingInference
+from gui import DenoisingApp
+from virtual_microphone import VirtualMicrophoneService
 
 __all__ = ["main"]
 
@@ -81,16 +109,54 @@ def main():
         else:
             os._exit(1)
 
-    # Initialize Virtual Microphone Service
+    # --- Auto-fix: Ensure ONNX Runtime if needed ---
+    if getattr(args, "backend", "onnx") == "onnx":
+        if not ensure_onnxruntime():
+            logging.error("ONNX Runtime is required for ONNX backend but could not be installed. Exiting.")
+            if hasattr(sys, "exit"):
+                sys.exit(1)
+            else:
+                os._exit(1)
+
+    # --- Auto-fix: Initialize Virtual Microphone Service with dependency/permission handling ---
+    virtual_mic_service = None
     try:
         virtual_mic_service = VirtualMicrophoneService()
         virtual_mic_service.create()
         virtual_mic_service.start()
+        logging.info("VirtualMicrophoneService initialized and started successfully.")
     except NotImplementedError as e:
         logging.warning(f"Virtual microphone not available on this platform: {e}")
         virtual_mic_service = None
+    except ModuleNotFoundError as e:
+        missing_pkg = str(e).split("'")[1] if "'" in str(e) else None
+        logging.warning(f"Missing dependency for VirtualMicrophoneService: {e}")
+        if missing_pkg:
+            logging.info(f"Attempting to install missing package: {missing_pkg}")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", missing_pkg])
+                importlib.invalidate_caches()
+                # Try again after installing
+                try:
+                    virtual_mic_service = VirtualMicrophoneService()
+                    virtual_mic_service.create()
+                    virtual_mic_service.start()
+                    logging.info("VirtualMicrophoneService initialized after installing missing dependency.")
+                except Exception as e2:
+                    logging.error(f"Failed to initialize VirtualMicrophoneService after installing {missing_pkg}: {e2}")
+                    virtual_mic_service = None
+            except Exception as e3:
+                logging.error(f"Failed to install {missing_pkg}: {e3}")
+                virtual_mic_service = None
+        else:
+            virtual_mic_service = None
+    except PermissionError as e:
+        logging.error(f"Permission error initializing VirtualMicrophoneService: {e}")
+        logging.error("Please run the application with appropriate permissions or check system audio device access.")
+        virtual_mic_service = None
     except Exception as e:
         logging.error(f"Failed to initialize VirtualMicrophoneService: {e}")
+        logging.debug(traceback.format_exc())
         virtual_mic_service = None
 
     # Initialize modules with validated parameters
