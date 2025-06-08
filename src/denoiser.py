@@ -2,7 +2,7 @@
 denoiser.py
 
 Handles loading, quantization, and inference for speech denoising models.
-- Supports ONNX and PyTorch models (e.g., Tiny Recurrent U-Net, SpeechDenoiser)
+- Supports PyTorch models (e.g., Tiny Recurrent U-Net, SpeechDenoiser)
 - CPU-only, offline inference
 - Quantization utilities for efficient real-time operation
 - Error handling for model load failures and unsupported formats
@@ -12,8 +12,7 @@ Author: aiGI Auto-Coder
 
 import logging
 import os
-import platform
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -23,35 +22,25 @@ try:
 except ImportError:
     torch = None
 
-try:
-    import onnxruntime as ort
-except ImportError:
-    ort = None
-
-from model_utils import select_model, quantize_model, check_compatibility
+from src.model_utils import select_model, quantize_model
 
 class DenoisingInference:
     """
-    Loads and runs efficient, CPU-only denoising models (ONNX or PyTorch).
+    Loads and runs efficient, CPU-only denoising models (PyTorch only).
     """
 
-    def __init__(self, model_path: str, backend: str = "onnx"):
+    def __init__(self, model_path: str):
         """
         Initialize the denoising model.
 
         Args:
-            model_path (str): Path to the model file.
-            backend (str): "onnx" or "pytorch".
+            model_path (str): Path to the PyTorch model file.
         """
         if not isinstance(model_path, str):
             raise TypeError("model_path must be a string.")
-        if not isinstance(backend, str):
-            raise TypeError("backend must be a string.")
         self.model_path = model_path
-        self.backend = backend.lower()
         self.model = None
         self._quantized = False
-        self.session = None
         self.device = "cpu"
         self.loaded = False
 
@@ -60,44 +49,24 @@ class DenoisingInference:
         Load the denoising model from file.
         Raises error on failure.
         """
-        if self.backend == "onnx":
-            if ort is None:
-                logging.error("ONNX Runtime is not installed.")
-                raise ImportError("ONNX Runtime is not installed.")
-            if not os.path.exists(self.model_path):
-                logging.error(f"ONNX model file not found: {self.model_path}")
-                raise FileNotFoundError(f"ONNX model file not found: {self.model_path}")
-            try:
-                self.session = ort.InferenceSession(self.model_path, providers=["CPUExecutionProvider"])
-                self.loaded = True
-            except Exception as e:
-                logging.error(f"Failed to load ONNX model: {e}")
-                raise RuntimeError(f"Failed to load ONNX model: {e}")
-        elif self.backend == "pytorch":
-            if torch is None:
-                logging.error("PyTorch is not installed.")
-                raise ImportError("PyTorch is not installed.")
-            if not os.path.exists(self.model_path):
-                logging.error(f"PyTorch model file not found: {self.model_path}")
-                raise FileNotFoundError(f"PyTorch model file not found: {self.model_path}")
-            try:
-                self.model = torch.load(self.model_path, map_location="cpu")
-                self.model.eval()
-                self.loaded = True
-            except Exception as e:
-                logging.error(f"Failed to load PyTorch model: {e}")
-                raise RuntimeError(f"Failed to load PyTorch model: {e}")
-        else:
-            logging.error(f"Unsupported backend: {self.backend}")
-            raise ValueError(f"Unsupported backend: {self.backend}")
+        if torch is None:
+            logging.error("PyTorch is not installed.")
+            raise ImportError("PyTorch is not installed.")
+        if not os.path.exists(self.model_path):
+            logging.error(f"PyTorch model file not found: {self.model_path}")
+            raise FileNotFoundError(f"PyTorch model file not found: {self.model_path}")
+        try:
+            self.model = torch.load(self.model_path, map_location="cpu")
+            self.model.eval()
+            self.loaded = True
+        except Exception as e:
+            logging.error(f"Failed to load PyTorch model: {e}")
+            raise RuntimeError(f"Failed to load PyTorch model: {e}")
 
     def quantize_model(self):
         """
         Quantize the model for CPU efficiency (if supported).
         """
-        if self.backend != "pytorch":
-            logging.warning("Quantization is only supported for PyTorch models.")
-            return
         if torch is None:
             logging.error("PyTorch is not installed.")
             raise ImportError("PyTorch is not installed.")
@@ -127,30 +96,17 @@ class DenoisingInference:
         if not isinstance(audio_buffer, np.ndarray):
             logging.error("audio_buffer must be a numpy ndarray.")
             raise TypeError("audio_buffer must be a numpy ndarray.")
-        if self.backend == "onnx":
-            try:
-                input_name = self.session.get_inputs()[0].name
-                input_data = audio_buffer.astype(np.float32)
-                output = self.session.run(None, {input_name: input_data})
-                return output[0]
-            except Exception as e:
-                logging.error(f"ONNX inference failed: {e}")
-                raise RuntimeError(f"ONNX inference failed: {e}")
-        elif self.backend == "pytorch":
-            if torch is None:
-                logging.error("PyTorch is not installed.")
-                raise ImportError("PyTorch is not installed.")
-            try:
-                with torch.no_grad():
-                    input_tensor = torch.from_numpy(audio_buffer).float().unsqueeze(0)
-                    output_tensor = self.model(input_tensor)
-                    return output_tensor.squeeze(0).cpu().numpy()
-            except Exception as e:
-                logging.error(f"PyTorch inference failed: {e}")
-                raise RuntimeError(f"PyTorch inference failed: {e}")
-        else:
-            logging.error(f"Unsupported backend: {self.backend}")
-            raise ValueError(f"Unsupported backend: {self.backend}")
+        if torch is None:
+            logging.error("PyTorch is not installed.")
+            raise ImportError("PyTorch is not installed.")
+        try:
+            with torch.no_grad():
+                input_tensor = torch.from_numpy(audio_buffer).float().unsqueeze(0)
+                output_tensor = self.model(input_tensor)
+                return output_tensor.squeeze(0).cpu().numpy()
+        except Exception as e:
+            logging.error(f"PyTorch inference failed: {e}")
+            raise RuntimeError(f"PyTorch inference failed: {e}")
 
     def is_quantized(self) -> bool:
         """

@@ -1,18 +1,42 @@
 """
 model_utils.py
 
-Utilities for model selection, quantization, and ONNX conversion.
+Utilities for model selection and quantization.
 - Supports Tiny Recurrent U-Net, SpeechDenoiser, and similar models
-- Provides functions for model selection, quantization, and conversion
-- Handles errors for unsupported models and conversion failures
+- Provides functions for model selection and quantization
+- Handles errors for unsupported models and failures
 
 Author: aiGI Auto-Coder
 """
 
 import logging
 import os
-import platform
-from typing import Any, Optional
+import urllib.request
+
+def ensure_model_exists(model_path: str, url: str) -> None:
+    """
+    Ensure the denoising model file exists at model_path.
+    If missing, download it from the given URL.
+
+    Args:
+        model_path (str): Path to the model file.
+        url (str): URL to download the model from.
+
+    Raises:
+        RuntimeError: If download fails.
+    """
+    if os.path.exists(model_path):
+        logging.info(f"Model file found: {model_path}")
+        return
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    logging.info(f"Model file not found at {model_path}. Downloading from {url} ...")
+    try:
+        urllib.request.urlretrieve(url, model_path)
+        logging.info(f"Model downloaded and saved to {model_path}")
+    except Exception as e:
+        logging.error(f"Failed to download model: {e}")
+        raise RuntimeError(f"Failed to download model: {e}")
+from typing import Any
 
 try:
     import torch
@@ -20,11 +44,6 @@ try:
     import torch.quantization
 except ImportError:
     torch = None
-
-try:
-    import onnx
-except ImportError:
-    onnx = None
 
 SUPPORTED_MODELS = {
     "Tiny Recurrent U-Net": "trunet",
@@ -161,95 +180,33 @@ def quantize_model(model: Any) -> Any:
         logging.error(f"Quantization failed: {e}")
         raise ValueError(f"Quantization failed: {e}")
 
-def convert_to_onnx(model: Any, output_path: str, input_shape=(1, 10)) -> None:
-    """
-    Convert a model to ONNX format.
+# Removed convert_to_onnx and ONNX-related compatibility checks
 
-    Args:
-        model (Any): Model object.
-        output_path (str): Path to save ONNX file.
-        input_shape (tuple): Shape of dummy input for export.
-
-    Raises:
-        ValueError: If conversion fails.
-        TypeError: If model or output_path is invalid.
+def check_compatibility(model_path: str) -> bool:
     """
-    if torch is None:
-        logging.error("PyTorch is required for ONNX export.")
-        raise ImportError("PyTorch is not installed.")
-    if not isinstance(model, nn.Module):
-        logging.error("Model must be a torch.nn.Module for ONNX export.")
-        raise TypeError("Model must be a torch.nn.Module for ONNX export.")
-    if not isinstance(output_path, str):
-        logging.error("Output path must be a string.")
-        raise TypeError("Output path must be a string.")
-    if not _is_cpu_only():
-        logging.error("ONNX export only supported on CPU.")
-        raise RuntimeError("ONNX export only supported on CPU.")
-    try:
-        dummy_input = torch.randn(*input_shape)
-        torch.onnx.export(
-            model,
-            dummy_input,
-            output_path,
-            export_params=True,
-            opset_version=12,
-            do_constant_folding=True,
-            input_names=['input'],
-            output_names=['output'],
-            dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
-        )
-        if not os.path.exists(output_path):
-            raise ValueError("ONNX export failed: file not created.")
-    except Exception as e:
-        logging.error(f"ONNX export failed: {e}")
-        raise ValueError(f"ONNX export failed: {e}")
-
-def check_compatibility(model_path: str, backend: str) -> bool:
-    """
-    Check if the model is compatible with the selected backend and platform.
+    Check if the model is compatible with PyTorch and the current platform.
 
     Args:
         model_path (str): Path to model file.
-        backend (str): "onnx" or "pytorch".
 
     Returns:
         bool: True if compatible, False otherwise.
     """
-    if not isinstance(model_path, str) or not isinstance(backend, str):
-        logging.error("model_path and backend must be strings.")
-        raise TypeError("model_path and backend must be strings.")
-    backend = backend.lower()
-    if backend not in ("onnx", "pytorch"):
-        logging.error(f"Unsupported backend: {backend}")
-        raise ValueError(f"Unsupported backend: {backend}")
-    if backend == "onnx":
-        if onnx is None:
-            logging.error("ONNX is not installed.")
+    if not isinstance(model_path, str):
+        logging.error("model_path must be a string.")
+        raise TypeError("model_path must be a string.")
+    if torch is None:
+        logging.error("PyTorch is not installed.")
+        return False
+    if not os.path.exists(model_path):
+        logging.error(f"PyTorch model file does not exist: {model_path}")
+        return False
+    try:
+        model = torch.load(model_path, map_location="cpu")
+        if not isinstance(model, nn.Module):
+            logging.error("Loaded object is not a torch.nn.Module.")
             return False
-        if not os.path.exists(model_path):
-            logging.error(f"ONNX model file does not exist: {model_path}")
-            return False
-        try:
-            onnx_model = onnx.load(model_path)
-            onnx.checker.check_model(onnx_model)
-            return True
-        except Exception as e:
-            logging.error(f"ONNX model compatibility check failed: {e}")
-            return False
-    elif backend == "pytorch":
-        if torch is None:
-            logging.error("PyTorch is not installed.")
-            return False
-        if not os.path.exists(model_path):
-            logging.error(f"PyTorch model file does not exist: {model_path}")
-            return False
-        try:
-            torch.load(model_path, map_location="cpu")
-            return True
-        except Exception as e:
-            logging.error(f"PyTorch model compatibility check failed: {e}")
-            return False
-    return False
-
-# End of model_utils.py
+        return True
+    except Exception as e:
+        logging.error(f"PyTorch model compatibility check failed: {e}")
+        return False

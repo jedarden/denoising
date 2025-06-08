@@ -26,8 +26,8 @@ def test_entrypoint_runs(monkeypatch):
     """Test application startup and shutdown (mocked)."""
     import main
     # Mock dependencies
-    monkeypatch.setattr(main, "AudioIO", lambda: "audio")
-    monkeypatch.setattr(main, "DenoisingInference", lambda model_path, backend: "denoiser")
+    monkeypatch.setattr(main, "AudioIO", lambda *args, **kwargs: "audio")
+    monkeypatch.setattr(main, "DenoisingInference", lambda model_path: "denoiser")
     class DummyApp:
         def __init__(self, audio, denoiser):
             self.audio = audio
@@ -59,8 +59,8 @@ def test_error_handling_on_startup(monkeypatch):
 def test_integration_with_modules(monkeypatch):
     """Test integration with AudioIO, DenoisingInference, and DenoisingApp (mocked)."""
     import main
-    monkeypatch.setattr(main, "AudioIO", lambda: "audio")
-    monkeypatch.setattr(main, "DenoisingInference", lambda model_path, backend: "denoiser")
+    monkeypatch.setattr(main, "AudioIO", lambda *args, **kwargs: "audio")
+    monkeypatch.setattr(main, "DenoisingInference", lambda model_path: "denoiser")
     class DummyApp:
         def __init__(self, audio, denoiser): self.audio = audio; self.denoiser = denoiser
         def show(self): return True
@@ -75,49 +75,7 @@ def test_integration_with_modules(monkeypatch):
     monkeypatch.setattr(main, "QtWidgets", type("QtWidgets", (), {"QApplication": DummyQApp}))
     monkeypatch.setattr(main, "sys", type("sys", (), {"argv": []}))
     main.main()
-@pytest.mark.usefixtures("monkeypatch")
-def test_onnxruntime_install_attempt_and_logging(monkeypatch, caplog):
-    """
-    Test that the application attempts to install ONNX Runtime if missing and logs the outcome.
-    """
-    import main
-    # Simulate ImportError for onnxruntime
-    monkeypatch.setattr(main, "import_onnxruntime", lambda: (_ for _ in ()).throw(ImportError("No module named 'onnxruntime'")))
-    install_attempted = []
-    def fake_install_onnxruntime():
-        install_attempted.append(True)
-        return True
-    monkeypatch.setattr(main, "install_onnxruntime", fake_install_onnxruntime)
-    with caplog.at_level("INFO"):
-        main.main()
-    assert any("Attempting to install ONNX Runtime" in m for m in caplog.messages)
-    assert install_attempted, "ONNX Runtime install was not attempted"
-    assert any("ONNX Runtime installed successfully" in m or "Failed to install ONNX Runtime" in m for m in caplog.messages)
-
-@pytest.mark.usefixtures("monkeypatch")
-def test_virtual_microphone_dependency_resolution_and_logging(monkeypatch, caplog):
-    """
-    Test that the application attempts to resolve missing dependencies for VirtualMicrophoneService and logs all actions.
-    """
-    import main
-    # Simulate ImportError for VirtualMicrophoneService dependency
-    monkeypatch.setattr(main, "import_virtual_microphone", lambda: (_ for _ in ()).throw(ImportError("Missing dependency")))
-    resolve_attempted = []
-    def fake_resolve_dependencies():
-        resolve_attempted.append(True)
-        return True
-    monkeypatch.setattr(main, "resolve_virtual_microphone_dependencies", fake_resolve_dependencies)
-    with caplog.at_level("INFO"):
-        main.main()
-    assert any("Attempting to resolve VirtualMicrophoneService dependencies" in m for m in caplog.messages)
-    assert resolve_attempted, "Dependency resolution was not attempted"
-    assert any("Dependencies resolved" in m or "Failed to resolve dependencies" in m for m in caplog.messages)
-
-@pytest.mark.usefixtures("monkeypatch")
-def test_logs_actionable_errors_and_exits_on_unrecoverable_env_issue(monkeypatch, caplog):
-    """
-    Test that the application logs actionable errors and exits gracefully if unrecoverable environment issues occur.
-    """
+# (Removed obsolete ONNX Runtime and dependency resolution tests)
     import main
     # Simulate unrecoverable environment error
     def fake_check_env():

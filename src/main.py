@@ -22,23 +22,7 @@ try:
 except ImportError:
     QtWidgets = None
 
-# --- Environment Auto-Fix: ONNX Runtime ---
-def ensure_onnxruntime():
-    try:
-        import onnxruntime
-        logging.info("ONNX Runtime is available.")
-        return True
-    except ImportError:
-        logging.warning("ONNX Runtime not found. Attempting to install via pip...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "onnxruntime"])
-            importlib.invalidate_caches()
-            import onnxruntime
-            logging.info("ONNX Runtime installed successfully.")
-            return True
-        except Exception as e:
-            logging.error(f"Failed to install ONNX Runtime: {e}")
-            return False
+# (Removed ONNX Runtime auto-fix logic)
 
 # --- Environment Auto-Fix: VirtualMicrophoneService dependencies ---
 def ensure_virtual_microphone_deps():
@@ -51,12 +35,16 @@ from denoiser import DenoisingInference
 from gui import DenoisingApp
 from virtual_microphone import VirtualMicrophoneService
 
+# --- Model Auto-Download URL ---
+SILERO_URL = "https://huggingface.co/snakers4/silero-denoiser/resolve/main/denoiser.pth"
+
+from model_utils import ensure_model_exists
+
 __all__ = ["main"]
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Real-Time Speech Denoising App")
-    parser.add_argument("--model", type=str, default="model.onnx", help="Path to model file (ONNX or PyTorch)")
-    parser.add_argument("--backend", type=str, default="onnx", choices=["onnx", "pytorch"], help="Inference backend")
+    parser.add_argument("--model", type=str, default="models/silero-denoiser.pth", help="Path to PyTorch model file (auto-downloads if missing)")
     parser.add_argument("--sample-rate", type=int, default=16000, help="Audio sample rate (Hz)")
     parser.add_argument("--buffer-ms", type=int, default=20, help="Buffer size in milliseconds")
     parser.add_argument("--channels", type=int, default=1, help="Number of audio channels")
@@ -75,6 +63,10 @@ def main():
     try:
         if argv is not None:
             args = parse_args(argv[1:])
+        else:
+            args = parse_args([])
+        # Ensure model file exists (auto-download if missing)
+        ensure_model_exists(args.model, SILERO_URL)
         else:
             args = parse_args([])
     except SystemExit as e:
@@ -102,21 +94,7 @@ def main():
             sys.exit(1)
         else:
             os._exit(1)
-    if getattr(args, "backend", "onnx") not in ("onnx", "pytorch"):
-        logging.error("Backend must be 'onnx' or 'pytorch'.")
-        if hasattr(sys, "exit"):
-            sys.exit(1)
-        else:
-            os._exit(1)
-
-    # --- Auto-fix: Ensure ONNX Runtime if needed ---
-    if getattr(args, "backend", "onnx") == "onnx":
-        if not ensure_onnxruntime():
-            logging.error("ONNX Runtime is required for ONNX backend but could not be installed. Exiting.")
-            if hasattr(sys, "exit"):
-                sys.exit(1)
-            else:
-                os._exit(1)
+    # (Removed backend validation and ONNX Runtime auto-fix logic)
 
     # --- Auto-fix: Initialize Virtual Microphone Service with dependency/permission handling ---
     virtual_mic_service = None

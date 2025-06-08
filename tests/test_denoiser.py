@@ -37,7 +37,7 @@ def test_denoisinginference_signature_and_docstring():
 def test_model_loading_unloading(monkeypatch):
     """Test model loading and unloading (mocked for CPU-only)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.onnx", backend="onnx")
+    instance = cls("mock_model.pth")
     monkeypatch.setattr(instance, "load_model", lambda: True)
     monkeypatch.setattr(instance, "unload_model", lambda: True)
     assert instance.load_model() is True
@@ -46,7 +46,7 @@ def test_model_loading_unloading(monkeypatch):
 def test_denoising_inference_logic(monkeypatch):
     """Test denoising inference logic (input/output checks, mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.onnx", backend="onnx")
+    instance = cls("mock_model.pth")
     # Mock inference method
     monkeypatch.setattr(instance, "infer", lambda x: [0.0 for _ in x])
     input_data = [0.1, 0.2, 0.3]
@@ -57,7 +57,7 @@ def test_denoising_inference_logic(monkeypatch):
 def test_error_handling_model_not_found(monkeypatch):
     """Test error handling for model not found (mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("bad_path.onnx", backend="onnx")
+    instance = cls("bad_path.pth")
     monkeypatch.setattr(instance, "load_model", lambda: (_ for _ in ()).throw(FileNotFoundError("Model not found")))
     with pytest.raises(FileNotFoundError):
         instance.load_model()
@@ -65,16 +65,12 @@ def test_error_handling_model_not_found(monkeypatch):
 def test_error_handling_invalid_input(monkeypatch):
     """Test error handling for invalid input (mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.onnx", backend="onnx")
-    monkeypatch.setattr(instance, "infer", lambda x: (_ for _ in ()).throw(ValueError("Invalid input")))
+    instance = cls("mock_model.pth")
+    monkeypatch.setattr(instance, "process_buffer", lambda x: (_ for _ in ()).throw(ValueError("Invalid input")))
     with pytest.raises(ValueError):
-        instance.infer(None)
+        instance.process_buffer(None)
 
 def test_input_validation(monkeypatch):
     """Test that invalid input types/values are rejected with clear errors (mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.onnx", backend="onnx")
-    monkeypatch.setattr(instance, "set_backend", lambda backend: backend in ("onnx", "pytorch"))
-    assert instance.set_backend("onnx") is True
-    assert instance.set_backend("pytorch") is True
-    assert instance.set_backend("gpu") is False
+    # Backend selection is no longer supported; this test is obsolete.

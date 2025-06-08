@@ -1,8 +1,6 @@
 # Core dependencies
 numpy
 torch
-onnx
-onnxruntime
 pyaudio
 sounddevice
 
@@ -16,3 +14,4 @@ pytest
 # - If you prefer PySide2 over PyQt5, install 'PySide2' instead of 'PyQt5'.
 # - 'sounddevice' is included as an alternative to PyAudio for some systems.
 # - All packages are compatible with the codebase as of 2025-06.
+# - ONNX and ONNX Runtime are no longer required; only PyTorch is supported for model inference.

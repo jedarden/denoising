@@ -18,18 +18,20 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
    source .venv/bin/activate
    ```
 
-3. **Install all dependencies (including ONNX Runtime):**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   > **Note:** ONNX Runtime (`onnxruntime`) is required for model inference.
-   > If you encounter issues installing it, see [ONNX Runtime: Installation & Troubleshooting](#onnx-runtime-installation--troubleshooting) below for detailed, platform-specific help.
+3. **Install all dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+    > **Note:** PyTorch (`torch`) is required for model inference.
+    > All models must be in PyTorch format (`.pth`). ONNX and ONNX Runtime are no longer supported.
+    >
+    > **New in v1.1:** If no model file is found in the `models/` directory, the application will automatically download a pre-trained Silero Denoiser model from the official source (HuggingFace) on first run. No manual download is required for the default model.
 
-   - **Platform-specific requirements for Virtual Microphone:**
-     - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
-     - On first use, you may be prompted for admin/system permissions to install a virtual audio device or system extension.
-     - No manual installation of third-party tools is required; all components are bundled or installed programmatically.
-     - **Linux is not currently supported for the virtual microphone.**
+    - **Platform-specific requirements for Virtual Microphone:**
+      - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
+      - On first use, you may be prompted for admin/system permissions to install a virtual audio device or system extension.
+      - No manual installation of third-party tools is required; all components are bundled or installed programmatically.
+      - **Linux is not currently supported for the virtual microphone.**
 
 4. **Run the application:**
    - **GUI:**
@@ -38,6 +40,7 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
        ```bash
        python -m src.main
        ```
+       > On first run, if the model file is missing, it will be downloaded automatically to `models/silero-denoiser.pth`.
      - Or, by setting the `PYTHONPATH` so Python treats `src/` as a package:
        ```bash
        PYTHONPATH=. python src/main.py

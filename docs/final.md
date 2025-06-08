@@ -198,6 +198,14 @@ TOTAL            |   44%     |   (N/A)     |   100%
 
 ## Deployment & Usage Instructions
 
+### Automatic Model Download
+
+On first run, if no model file is found in the `models/` directory, the application will automatically download a pre-trained Silero Denoiser model from the official HuggingFace repository:
+
+- **Default model path:** `models/silero-denoiser.pth`
+- **Source:** [https://huggingface.co/snakers4/silero-denoiser/resolve/main/denoiser.pth](https://huggingface.co/snakers4/silero-denoiser/resolve/main/denoiser.pth)
+
+This process is fully automatic and requires no user intervention. All actions and outcomes are logged. If you wish to use a custom model, specify the `--model` argument with your own `.pth` file path.
 ### Prerequisites
 
 - Python 3.11+
