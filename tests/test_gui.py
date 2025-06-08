@@ -38,6 +38,88 @@ def test_single_denoisingapp_class():
     assert isinstance(gui.DenoisingApp, type)
     assert len([name for name in dir(gui) if name == "DenoisingApp"]) == 1
 
+def test_waveform_plot_widget_type(monkeypatch):
+    """
+    Test that the waveform plot widgets are QWidget-compatible and of the correct type.
+    """
+    # Skip test if QtWidgets is not available
+    if not hasattr(gui, "QtWidgets") or gui.QtWidgets is None:
+        pytest.skip("QtWidgets not available, skipping GUI widget test.")
+
+    # Patch AudioIO and Denoiser dependencies if needed
+    class DummyAudioIO:
+        pass
+    class DummyDenoiser:
+        pass
+
+    # Instantiate the app
+    app = gui.DenoisingApp(audio_io=DummyAudioIO(), denoiser=DummyDenoiser())
+
+    # Check input_waveform_plot and output_waveform_plot types
+    if hasattr(gui, "pg") and gui.pg is not None:
+        # Should be pyqtgraph.PlotWidget
+        assert isinstance(app.input_waveform_plot, gui.pg.PlotWidget)
+        assert isinstance(app.output_waveform_plot, gui.pg.PlotWidget)
+    else:
+        # Should be QLabel as fallback
+        assert isinstance(app.input_waveform_plot, gui.QtWidgets.QLabel)
+        assert isinstance(app.output_waveform_plot, gui.QtWidgets.QLabel)
+def test_gui_launch_and_visualizer_embedding(monkeypatch):
+    """
+    Test that the GUI launches, pyqtgraph PlotWidgets are embedded, and waveform plots update without error.
+    """
+    import importlib
+
+    # Reload gui to ensure fresh import
+    importlib.reload(gui)
+
+    # Patch QtWidgets and pyqtgraph for headless test if needed
+    if gui.QtWidgets is None or gui.pg is None:
+        pytest.skip("PyQt5 or pyqtgraph not available for GUI test.")
+
+    # Dummy audio_io with virtual mic unavailable
+    class DummyAudioIO:
+        def __init__(self):
+            self._virtual_microphone_service = None
+            self.selected_device = None
+        def select_device(self, device_id):
+            self.selected_device = device_id
+            return True
+        def enumerate_devices(self):
+            return [{"id": 0, "name": "Dummy Device"}]
+        def start_stream(self, callback):
+            # Simulate a short audio stream
+            import numpy as np
+            dummy_audio = (np.random.rand(512) * 2 - 1).astype(np.float32)
+            callback(dummy_audio.tobytes())
+            return True
+
+    class DummyDenoiser:
+        def process_buffer(self, audio):
+            return audio, False
+
+    app = gui.QtWidgets.QApplication.instance() or gui.QtWidgets.QApplication([])
+    denoising_app = gui.DenoisingApp(DummyAudioIO(), DummyDenoiser())
+
+    # Check that waveform plots are PlotWidget
+    assert isinstance(denoising_app.input_waveform_plot, gui.pg.PlotWidget)
+    assert isinstance(denoising_app.output_waveform_plot, gui.pg.PlotWidget)
+
+    # Simulate a waveform update
+    import numpy as np
+    test_audio = np.sin(np.linspace(0, 2 * np.pi, 512)).astype(np.float32)
+    denoising_app.input_waveform_plot.clear()
+    denoising_app.input_waveform_plot.plot(test_audio, pen='r')
+    denoising_app.output_waveform_plot.clear()
+    denoising_app.output_waveform_plot.plot(test_audio, pen='g')
+
+    # Check that no error is raised and plots have data
+    assert denoising_app.input_waveform_plot.listDataItems()
+    assert denoising_app.output_waveform_plot.listDataItems()
+
+    # Check that the status label shows the virtual mic message
+    status_text = denoising_app.status_label.text() if hasattr(denoising_app.status_label, "text") else ""
+    assert "virtual microphone" in status_text.lower() or "feature disabled" in status_text.lower()
 def test_gui_initialization_and_teardown(monkeypatch):
     """Test GUI initialization and teardown (mocked)."""
     # Mock QtWidgets.QMainWindow if not available

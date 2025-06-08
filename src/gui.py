@@ -25,48 +25,7 @@ try:
 except ImportError:
     pg = None
 
-# Dummy plot widget for headless/test environments
-class _DummyPlotWidget:
-    def __init__(self, *a, **k):
-        self.data = None
-        self.title = ""
-    def plot(self, *a, **k):
-        self.data = a[0] if a else None
-    def clear(self):
-        self.data = None
-    def setTitle(self, title):
-        self.title = title
-    def setYRange(self, *a, **k):
-        pass
-    def setXRange(self, *a, **k):
-        pass
-    def setLabel(self, *a, **k):
-        pass
-    def getPlotItem(self):
-        return self
-
-# Dummy widget classes for headless/mock environments
-class _DummyWidget:
-    """
-    Mock widget for headless/test environments.
-    Stores state and simulates widget behavior for testing.
-    """
-    def __init__(self, *a, **k):
-        self.text = ""
-        self.items = []
-        self.layout = None
-        self.window_title = ""
-        self.geometry = None
-        self.signals = {}
-        self.cleared = False
-
-    def setText(self, text):
-        self.text = text
-
-    def clear(self):
-        self.cleared = True
-        self.items.clear()
-        self.text = ""
+# No longer need dummy widget classes; use QWidget-compatible placeholders instead.
 
     def addItem(self, item):
         self.items.append(item)
@@ -128,6 +87,12 @@ class DenoisingApp(_BaseMainWindow):
         self.audio_io = audio_io
         self.denoiser = denoiser
         self.device_list = []
+        self.virtual_mic_available = True
+        # Check for virtual microphone backend availability
+        if hasattr(self.audio_io, "_virtual_microphone_service"):
+            if self.audio_io._virtual_microphone_service is None:
+                self.virtual_mic_available = False
+                logging.warning("Virtual microphone backend is not available on this platform. Feature disabled.")
         if QtWidgets and hasattr(QtWidgets, "QLabel"):
             self.device_label = QtWidgets.QLabel("Input Device:", self)
             self.device_combo = QtWidgets.QComboBox(self)
@@ -138,25 +103,41 @@ class DenoisingApp(_BaseMainWindow):
             self.stop_button = QtWidgets.QPushButton("Stop", self)
             self.status_label = QtWidgets.QLabel("Status: Idle", self)
             # Add waveform plot widgets using pyqtgraph if available
-            if pg is not None:
+            if pg is not None and QtWidgets is not None:
                 self.input_waveform_plot = pg.PlotWidget(title="Noisy Input")
                 self.output_waveform_plot = pg.PlotWidget(title="Denoised Output")
                 self.input_waveform_plot.setYRange(-1, 1)
                 self.output_waveform_plot.setYRange(-1, 1)
+            elif QtWidgets is not None:
+                # Use QLabel as a QWidget-compatible placeholder
+                self.input_waveform_plot = QtWidgets.QLabel("Plot unavailable")
+                self.output_waveform_plot = QtWidgets.QLabel("Plot unavailable")
             else:
-                self.input_waveform_plot = _DummyPlotWidget()
-                self.output_waveform_plot = _DummyPlotWidget()
+                # Headless fallback: do not create plot widgets
+                self.input_waveform_plot = None
+                self.output_waveform_plot = None
         else:
-            self.device_label = _DummyWidget()
-            self.device_combo = _DummyWidget()
-            self.refresh_button = _DummyWidget()
-            self.denoise_checkbox = _DummyWidget()
-            self.denoise_checkbox.checked = True
-            self.start_button = _DummyWidget()
-            self.stop_button = _DummyWidget()
-            self.status_label = _DummyWidget()
-            self.input_waveform_plot = _DummyPlotWidget()
-            self.output_waveform_plot = _DummyPlotWidget()
+            if QtWidgets is not None:
+                self.device_label = QtWidgets.QLabel("Device")
+                self.device_combo = QtWidgets.QComboBox()
+                self.refresh_button = QtWidgets.QPushButton("Refresh Devices")
+                self.denoise_checkbox = QtWidgets.QCheckBox("Denoising On")
+                self.denoise_checkbox.setChecked(True)
+                self.start_button = QtWidgets.QPushButton("Start")
+                self.stop_button = QtWidgets.QPushButton("Stop")
+                self.status_label = QtWidgets.QLabel("Status: Idle")
+                self.input_waveform_plot = QtWidgets.QLabel("Plot unavailable")
+                self.output_waveform_plot = QtWidgets.QLabel("Plot unavailable")
+            else:
+                self.device_label = None
+                self.device_combo = None
+                self.refresh_button = None
+                self.denoise_checkbox = None
+                self.start_button = None
+                self.stop_button = None
+                self.status_label = None
+                self.input_waveform_plot = None
+                self.output_waveform_plot = None
         self.init_ui()
         self.init_ui()
 
