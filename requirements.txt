@@ -1,0 +1,18 @@
+# Core dependencies
+numpy
+torch
+onnx
+onnxruntime
+pyaudio
+sounddevice
+
+# GUI
+PyQt5
+
+# Testing
+pytest
+
+# Notes:
+# - If you prefer PySide2 over PyQt5, install 'PySide2' instead of 'PyQt5'.
+# - 'sounddevice' is included as an alternative to PyAudio for some systems.
+# - All packages are compatible with the codebase as of 2025-06.
