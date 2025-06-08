@@ -67,8 +67,6 @@ def main():
             args = parse_args([])
         # Ensure model file exists (auto-download if missing)
         ensure_model_exists(args.model, SILERO_URL)
-        else:
-            args = parse_args([])
     except SystemExit as e:
         # If running under pytest, re-raise as RuntimeError for test compatibility
         if "pytest" in sys.modules:
