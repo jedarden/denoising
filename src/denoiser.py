@@ -116,6 +116,11 @@ class DenoisingInference:
         """
         Run denoising inference on a single audio buffer.
 
+        Bulletproofs input length for all ReflectionPad1d layers:
+        - Dynamically determines the maximum required single-side padding across all ReflectionPad1d layers in the model.
+        - If input length is ≤ 2 * max_single_pad, pads with zeros to at least (2 * max_single_pad + 1).
+        - Robust logging and error handling ensure this logic is always applied.
+
         Args:
             audio_buffer (np.ndarray): Input audio buffer.
 
@@ -136,20 +141,31 @@ class DenoisingInference:
         if torch is None:
             logging.error("PyTorch is not installed.")
             raise ImportError("PyTorch is not installed.")
+
         # 1. If extremely short, bypass and return raw audio (legacy behavior)
         if len(audio_buffer) < 2:
             logging.warning(f"Input audio buffer too short to pad safely (len={len(audio_buffer)}). Denoising bypassed, returning raw audio.")
             return audio_buffer, True
-        # 2. If input is too short for ReflectionPad1d, pad to max(min_input_length, required_pad_sum+1, max_single_pad+1)
+
+        # 2. Bulletproof ReflectionPad1d safety: pad to (2 * max_single_pad + 1) if needed
+        if self.max_single_pad > 0 and len(audio_buffer) <= 2 * self.max_single_pad:
+            min_required = 2 * self.max_single_pad + 1
+            pad_len = min_required - len(audio_buffer)
+            audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
+            logging.warning(
+                f"Input audio buffer too short for ReflectionPad1d safety (len={len(audio_buffer)-pad_len} <= 2*max_single_pad={2*self.max_single_pad}). "
+                f"Padded with zeros to {min_required} samples to guarantee ReflectionPad1d will not throw."
+            )
+        # 3. If input is too short for ReflectionPad1d (legacy/fallback logic)
         elif (self.required_pad_sum > 0 and (len(audio_buffer) <= self.required_pad_sum or len(audio_buffer) <= self.max_single_pad)):
             min_required = max(self.min_input_length, self.required_pad_sum + 1, self.max_single_pad + 1)
             pad_len = min_required - len(audio_buffer)
             audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
             logging.warning(
-                f"Input audio buffer too short for ReflectionPad1d (len={len(audio_buffer)} <= pad_sum={self.required_pad_sum} or <= max_single_pad={self.max_single_pad}). "
+                f"Input audio buffer too short for ReflectionPad1d (len={len(audio_buffer)-pad_len} <= pad_sum={self.required_pad_sum} or <= max_single_pad={self.max_single_pad}). "
                 f"Padded with zeros to {min_required} samples to avoid ReflectionPad1d error."
             )
-        # 3. If model's required_pad_sum is not determined, strictly enforce force_min_input_length if set
+        # 4. If model's required_pad_sum is not determined, strictly enforce force_min_input_length if set
         elif self.required_pad_sum == 0 and self.force_min_input_length is not None and len(audio_buffer) < self.force_min_input_length:
             pad_len = self.force_min_input_length - len(audio_buffer)
             audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
@@ -157,7 +173,7 @@ class DenoisingInference:
                 f"Model's ReflectionPad1d padding could not be determined. Input audio buffer too short (len={len(audio_buffer)-pad_len}), "
                 f"padded with zeros to force_min_input_length={self.force_min_input_length} samples."
             )
-        # 4. If input is short but can be padded (legacy min_input_length logic)
+        # 5. If input is short but can be padded (legacy min_input_length logic)
         elif len(audio_buffer) < self.min_input_length:
             pad_len = self.min_input_length - len(audio_buffer)
             if len(audio_buffer) > 1:

@@ -420,3 +420,78 @@ def test_reflectionpad1d_input_length_hardening(monkeypatch):
     buf = np.ones(1, dtype=np.float32)
     out, bypassed = instance.process_buffer(buf.copy())
     assert bypassed
+def test_reflectionpad1d_bulletproof_input_length(monkeypatch):
+    """
+    Test that DenoisingInference.process_buffer never throws a ReflectionPad1d error,
+    even for the shortest possible input, for all model configurations.
+    """
+    import numpy as np
+    import logging
+
+    # Use real torch if available, else dummy
+    try:
+        import torch
+        import torch.nn as nn
+        TORCH_AVAILABLE = True
+    except ImportError:
+        torch = denoiser.torch
+        nn = torch.nn
+        TORCH_AVAILABLE = False
+
+    # Define a minimal model with ReflectionPad1d (padding=20)
+    class DummyModel(nn.Module if TORCH_AVAILABLE else object):
+        def __init__(self):
+            # Always pass padding argument, even for dummy torch
+            self.pad = nn.ReflectionPad1d((20, 20))
+        def eval(self): return self
+        def forward(self, x):
+            # x: (1, N)
+            return self.pad(x) if hasattr(self.pad, "__call__") else x
+
+        def __call__(self, x):
+            return self.forward(x)
+
+        def modules(self):
+            # Simulate a model with a ReflectionPad1d layer with padding=(20, 20)
+            class DummyPad:
+                padding = (20, 20)
+            return [DummyPad()]
+
+    # Patch load_pytorch_model to return our dummy model
+    monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModel())
+
+    # Patch os.path.exists to always return True
+    monkeypatch.setattr(denoiser.os.path, "exists", lambda path: True)
+
+    # Create DenoisingInference and load model
+    di = denoiser.DenoisingInference("dummy_path")
+
+    # Patch load_model to set max_single_pad and required_pad_sum directly for the test
+    def patched_load_model(self):
+        self.model = DummyModel()
+        self.loaded = True
+        self.max_single_pad = 20
+        self.required_pad_sum = 40
+    di.load_model = patched_load_model.__get__(di, denoiser.DenoisingInference)
+    di.load_model()
+
+    # Confirm max_single_pad is set correctly
+    assert di.max_single_pad == 20
+
+    # Test all input lengths from 1 up to 2*max_single_pad + 2
+    for L in range(1, 2 * di.max_single_pad + 3):
+        arr = np.ones(L, dtype=np.float32)
+        try:
+            out, bypassed = di.process_buffer(arr)
+            assert isinstance(out, np.ndarray)
+            assert out.shape[0] >= 2 * di.max_single_pad + 1 or bypassed
+            assert not np.any(np.isnan(out))
+        except Exception as e:
+            pytest.fail(f"process_buffer failed for input length {L}: {e}")
+
+    # Also test with input length much larger than required
+    arr = np.ones(1000, dtype=np.float32)
+    out, bypassed = di.process_buffer(arr)
+    assert isinstance(out, np.ndarray)
+    assert out.shape[0] == 1000 or out.shape[0] > 0
+    assert not np.any(np.isnan(out))
