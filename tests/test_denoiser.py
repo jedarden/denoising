@@ -67,11 +67,37 @@ def test_short_audio_buffer_padding(monkeypatch):
     instance.model = DummyModel()
     # Short buffer
     short_audio = np.ones(10, dtype=np.float32)
-    output = instance.process_buffer(short_audio)
+    output, bypassed = instance.process_buffer(short_audio)
     assert isinstance(output, np.ndarray)
     assert len(output) == min_len
+    assert not bypassed
     # The first 10 samples should match input, the rest should be padded (reflection or zeros)
     np.testing.assert_allclose(output[:10], short_audio, rtol=1e-5)
+
+def test_extremely_short_audio_buffer_bypasses_denoising(monkeypatch):
+    """Test that extremely short audio buffers (<2 samples) bypass denoising and return raw audio."""
+    import numpy as np
+    cls = denoiser.DenoisingInference
+    min_len = 64
+    instance = cls("mock_model.pth", min_input_length=min_len)
+    instance.loaded = True
+    # Mock model: just returns input tensor as output
+    class DummyModel:
+        def eval(self): return self
+        def __call__(self, x): return x
+    instance.model = DummyModel()
+    # Test with 1-sample buffer
+    short_audio = np.array([0.5], dtype=np.float32)
+    output, bypassed = instance.process_buffer(short_audio)
+    assert isinstance(output, np.ndarray)
+    assert np.allclose(output, short_audio)
+    assert bypassed
+    # Test with 0-sample buffer
+    empty_audio = np.array([], dtype=np.float32)
+    output, bypassed = instance.process_buffer(empty_audio)
+    assert isinstance(output, np.ndarray)
+    assert np.allclose(output, empty_audio)
+    assert bypassed
 
 def test_error_handling_model_not_found(monkeypatch):
     """Test error handling for model not found (mocked)."""

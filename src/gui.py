@@ -204,11 +204,14 @@ class DenoisingApp(_BaseMainWindow):
                     if hasattr(self.denoise_checkbox, "isChecked")
                     else getattr(self.denoise_checkbox, "checked", True)
                 )
+                bypassed = False
                 if denoise_on:
-                    processed = self.denoiser.process_buffer(audio)
+                    processed, bypassed = self.denoiser.process_buffer(audio)
                 else:
                     processed = audio
                 out_data = (processed * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+                if denoise_on and bypassed:
+                    self.update_status("Denoising bypassed: input too short, raw audio used")
                 return out_data
             except Exception as e:
                 self.show_error(f"Audio processing error: {e}")
@@ -220,9 +223,11 @@ class DenoisingApp(_BaseMainWindow):
                 self.show_error("Failed to start audio stream.")
                 self.update_status("Error: Stream not started")
             else:
-                self.update_status("Denoising started (A/B toggle: {})".format(
-                    "On" if (self.denoise_checkbox.isChecked() if hasattr(self.denoise_checkbox, "isChecked") else getattr(self.denoise_checkbox, "checked", True)) else "Off"
-                ))
+                # Only update status if not already set to a bypass message
+                if not hasattr(self.status_label, "text") or "bypassed" not in getattr(self.status_label, "text", "").lower():
+                    self.update_status("Denoising started (A/B toggle: {})".format(
+                        "On" if (self.denoise_checkbox.isChecked() if hasattr(self.denoise_checkbox, "isChecked") else getattr(self.denoise_checkbox, "checked", True)) else "Off"
+                    ))
         except Exception as e:
             self.show_error(f"Failed to start denoising: {e}")
 

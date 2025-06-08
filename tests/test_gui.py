@@ -57,6 +57,31 @@ def test_device_selection(monkeypatch):
 
 def test_start_stop_logic(monkeypatch):
     """Test start/stop logic (mocked)."""
+def test_status_label_updates_on_bypass(monkeypatch):
+    """Test that the GUI status label updates when denoising is bypassed due to short input."""
+    import numpy as np
+    # Dummy denoiser that always bypasses
+    class DummyBypassDenoiser:
+        def process_buffer(self, audio):
+            return audio, True
+    # Dummy AudioIO with start_stream that immediately calls callback
+    class DummyAudioIO:
+        def start_stream(self, callback):
+            # Simulate a short buffer (1 sample)
+            short_audio = (np.array([0.5], dtype=np.float32) * 32768.0).astype(np.int16).tobytes()
+            callback(short_audio)
+            return True
+        def stop_stream(self):
+            return True
+        def enumerate_devices(self):
+            return []
+        def select_device(self, device_id):
+            return True
+    app = gui.DenoisingApp(DummyAudioIO(), DummyBypassDenoiser())
+    # Simulate denoising start
+    app.start_denoising()
+    # Check that the status label was updated to indicate bypass
+    assert "bypassed" in app.status_label.text.lower()
 def test_ab_toggle_and_error_feedback(monkeypatch):
     """Test A/B toggle (denoising on/off) and error feedback in the GUI callback."""
     import numpy as np
