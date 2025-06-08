@@ -176,9 +176,12 @@ def test_no_reflectionpad1d_error_on_edge_cases(monkeypatch):
         def modules(self):
             return self._modules
         def eval(self): pass
+        def __call__(self, x): return x  # Make it callable for inference
 
     # Patch load_pytorch_model to return DummyModel
     monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModel())
+    # Patch os.path.exists to always return True
+    monkeypatch.setattr("os.path.exists", lambda path: True)
 
     # Create DenoisingInference with min_input_length < required_pad_sum
     min_input_length = 4
@@ -195,8 +198,14 @@ def test_no_reflectionpad1d_error_on_edge_cases(monkeypatch):
         try:
             out, bypassed = instance.process_buffer(audio)
             assert isinstance(out, np.ndarray)
-            # Output should be at least required_pad_sum+1 or min_input_length
-            assert len(out) >= max(min_input_length, instance.required_pad_sum + 1)
+            if buf_len < 2:
+                # Should be bypassed, output matches input
+                assert np.allclose(out, audio)
+                assert bypassed
+            else:
+                # Output should be at least required_pad_sum+1 or min_input_length
+                assert len(out) >= max(min_input_length, instance.required_pad_sum + 1)
+                assert not bypassed
         except Exception as e:
             pytest.fail(f"ReflectionPad1d error or unexpected exception for buf_len={buf_len}: {e}")
 
@@ -205,12 +214,14 @@ def test_force_min_input_length_enforced(monkeypatch):
     Test that force_min_input_length is strictly enforced if model padding cannot be determined.
     """
     import numpy as np
-
     class DummyModelNoPad:
         def modules(self): return []
         def eval(self): pass
+        def __call__(self, x): return x
 
     monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModelNoPad())
+    # Patch os.path.exists to always return True
+    monkeypatch.setattr("os.path.exists", lambda path: True)
 
     force_min = 32
     instance = denoiser.DenoisingInference("mock_model.pth", min_input_length=4, force_min_input_length=force_min)
@@ -221,4 +232,74 @@ def test_force_min_input_length_enforced(monkeypatch):
     audio = np.ones(5, dtype=np.float32)
     out, bypassed = instance.process_buffer(audio)
     assert isinstance(out, np.ndarray)
-    assert len(out) >= force_min
+    assert len(out) == force_min
+    assert not bypassed
+def test_reflectionpad1d_padding_and_no_error(monkeypatch):
+    """Test that process_buffer always pads input to avoid ReflectionPad1d error, even for shortest input."""
+    import numpy as np
+    import torch
+
+    cls = denoiser.DenoisingInference
+    min_len = 8
+
+    # Dummy model with ReflectionPad1d layer
+    class DummyPadModel(torch.nn.Module):
+        def __init__(self, pad):
+            super().__init__()
+            self.pad = pad
+            self.pad_layer = torch.nn.ReflectionPad1d(pad)
+        def eval(self): return self
+        def forward(self, x):
+            # Just apply the pad and return
+            return self.pad_layer(x)
+
+    pad = (5, 5)
+    required_pad_sum = sum(pad)
+    instance = cls("mock_model.pth", min_input_length=min_len)
+    instance.loaded = True
+    instance.model = DummyPadModel(pad)
+    instance.required_pad_sum = required_pad_sum
+
+    # Test with input shorter than required_pad_sum
+    short_audio = np.ones(3, dtype=np.float32)
+    output, bypassed = instance.process_buffer(short_audio)
+    assert isinstance(output, np.ndarray)
+    # Output should be at least min_input_length or required_pad_sum+1
+    assert len(output) >= max(min_len, required_pad_sum + 1)
+    assert not bypassed
+
+    # Test with input exactly equal to required_pad_sum
+    exact_audio = np.ones(required_pad_sum, dtype=np.float32)
+    output, bypassed = instance.process_buffer(exact_audio)
+    assert isinstance(output, np.ndarray)
+    assert len(output) >= max(min_len, required_pad_sum + 1)
+    assert not bypassed
+
+    # Test with input just above required_pad_sum
+    just_enough_audio = np.ones(required_pad_sum + 1, dtype=np.float32)
+    output, bypassed = instance.process_buffer(just_enough_audio)
+    assert isinstance(output, np.ndarray)
+    # Output length should be input + sum(pad) due to ReflectionPad1d
+    assert len(output) == (required_pad_sum + 1 + required_pad_sum)
+    assert not bypassed
+
+    # Test with normal input
+    normal_audio = np.ones(20, dtype=np.float32)
+    output, bypassed = instance.process_buffer(normal_audio)
+    assert isinstance(output, np.ndarray)
+    # Output length should be input + sum(pad) due to ReflectionPad1d
+    assert len(output) == (20 + required_pad_sum)
+    assert not bypassed
+
+    # Test with force_min_input_length fallback
+    instance.required_pad_sum = 0
+    instance.force_min_input_length = 12
+    # Patch model to not add any padding
+    class IdentityModel:
+        def __call__(self, x): return x
+    instance.model = IdentityModel()
+    short_audio = np.ones(5, dtype=np.float32)
+    output, bypassed = instance.process_buffer(short_audio)
+    assert isinstance(output, np.ndarray)
+    assert len(output) == 12
+    assert not bypassed
