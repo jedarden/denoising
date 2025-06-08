@@ -19,9 +19,9 @@ try:
 except ImportError:
     QtWidgets = None
 
-from src.audio_io import AudioIO
-from src.denoiser import DenoisingInference
-from src.gui import DenoisingApp
+from .audio_io import AudioIO
+from .denoiser import DenoisingInference
+from .gui import DenoisingApp
 
 __all__ = ["main"]
 

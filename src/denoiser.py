@@ -28,7 +28,7 @@ try:
 except ImportError:
     ort = None
 
-from src.model_utils import select_model, quantize_model, check_compatibility
+from .model_utils import select_model, quantize_model, check_compatibility
 
 class DenoisingInference:
     """
