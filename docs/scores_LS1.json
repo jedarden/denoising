@@ -1,0 +1,89 @@
+{
+  "layer": "LS1",
+  "timestamp": "2025-06-07T18:13:21Z",
+  "aggregate_scores": {
+    "overall": 32.0,
+    "complexity": 80.0,
+    "modularity": 60.0,
+    "coverage": 5.0,
+    "maintainability": 40.0,
+    "cross_platform_cpu_only": 35.0
+  },
+  "delta": {
+    "overall": 0.0,
+    "complexity": 0.0,
+    "modularity": 0.0,
+    "coverage": 0.0,
+    "maintainability": 0.0,
+    "cross_platform_cpu_only": 0.0
+  },
+  "thresholds": {
+    "epsilon": 3.0,
+    "complexity_max": 15,
+    "coverage_min": 80,
+    "performance_target": 85
+  },
+  "decision": "continue_reflection",
+  "detailed_metrics": {
+    "audio_io.py": {
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "maintainability_index": 80
+      },
+      "modularity": 60,
+      "coverage": 5,
+      "maintainability": 40,
+      "cross_platform_cpu_only": 35,
+      "rationale": "Single class with clear intent and docstrings, but only stubs and TODOs. No error handling, platform logic, or tests."
+    },
+    "denoiser.py": {
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "maintainability_index": 80
+      },
+      "modularity": 60,
+      "coverage": 5,
+      "maintainability": 40,
+      "cross_platform_cpu_only": 35,
+      "rationale": "Single class with clear intent and docstrings, but only stubs and TODOs. No error handling, platform logic, or tests."
+    },
+    "gui.py": {
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 2,
+        "maintainability_index": 70
+      },
+      "modularity": 50,
+      "coverage": 5,
+      "maintainability": 30,
+      "cross_platform_cpu_only": 30,
+      "rationale": "Duplicated class/methods, only stubs, no real logic. No error handling, platform logic, or tests."
+    },
+    "main.py": {
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "maintainability_index": 60
+      },
+      "modularity": 40,
+      "coverage": 0,
+      "maintainability": 20,
+      "cross_platform_cpu_only": 30,
+      "rationale": "Duplicate main functions, only wiring logic, no error handling or platform logic. No tests."
+    },
+    "model_utils.py": {
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "maintainability_index": 70
+      },
+      "modularity": 60,
+      "coverage": 5,
+      "maintainability": 40,
+      "cross_platform_cpu_only": 40,
+      "rationale": "Function stubs with docstrings, but no logic. Duplicate/overlapping definitions. No tests."
+    }
+  }
+}

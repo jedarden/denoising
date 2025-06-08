@@ -1,0 +1,60 @@
+# Project-specific ignores
+.roo/
+aigi.md
+
+# Python virtual environments
+.venv/
+.env/
+.venv
+env/
+ENV/
+env.bak/
+venv/
+.venv.bak/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.coverage
+.cache/
+*.cover
+*.pyc
+*.pyo
+*.pyd
+
+# Test and coverage artifacts
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.coveragerc
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+
+# Logs
+logs/
+*.log
+
+# Editor and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# OS-specific files
+*.swp
+*.swo
+
+# Miscellaneous
+*.bak
+*.tmp
+.roomodes
