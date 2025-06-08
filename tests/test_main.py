@@ -168,3 +168,22 @@ def test_module_run_no_import_error():
     assert result.returncode in (0, 1), f"Non-zero exit: {result.returncode}\nSTDERR:\n{result.stderr}"
     assert "ImportError" not in result.stderr, f"ImportError in stderr:\n{result.stderr}"
     assert "ModuleNotFoundError" not in result.stderr, f"ModuleNotFoundError in stderr:\n{result.stderr}"
+def test_absolute_imports_resolve():
+    """
+    Verifies that all internal src.* imports resolve correctly when running as a module.
+    This ensures that 'python -m src.main' will not fail due to import errors.
+    """
+    import importlib
+    modules = [
+        "src.main",
+        "src.audio_io",
+        "src.denoiser",
+        "src.gui",
+        "src.model_utils",
+        "src.virtual_microphone",
+    ]
+    for mod in modules:
+        try:
+            importlib.import_module(mod)
+        except ImportError as e:
+            raise AssertionError(f"Failed to import {mod}: {e}")

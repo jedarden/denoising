@@ -38,7 +38,7 @@ from src.virtual_microphone import VirtualMicrophoneService
 # --- Model Auto-Download URL ---
 SILERO_URL = "https://huggingface.co/snakers4/silero-denoiser/resolve/main/denoiser.pth"
 
-from model_utils import ensure_model_exists
+from src.model_utils import ensure_model_exists
 
 __all__ = ["main"]
 
