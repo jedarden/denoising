@@ -43,8 +43,22 @@ from src.model_utils import ensure_model_exists
 __all__ = ["main"]
 
 def parse_args(argv=None):
+    import argparse
+    from src.model_utils import MODEL_REGISTRY
     parser = argparse.ArgumentParser(description="Real-Time Speech Denoising App")
-    parser.add_argument("--model", type=str, default="models/silero-denoiser.pth", help="Path to PyTorch model file (auto-downloads if missing)")
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default="silero",
+        choices=list(MODEL_REGISTRY.keys()),
+        help="Name of the pre-trained denoising model to use (default: silero)."
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Path to model file (overrides --model-name default path)."
+    )
     parser.add_argument("--sample-rate", type=int, default=16000, help="Audio sample rate (Hz)")
     parser.add_argument("--buffer-ms", type=int, default=20, help="Buffer size in milliseconds")
     parser.add_argument("--channels", type=int, default=1, help="Number of audio channels")
@@ -65,8 +79,13 @@ def main():
             args = parse_args(argv[1:])
         else:
             args = parse_args([])
-        # Ensure model file exists (auto-download if missing)
-        ensure_model_exists(args.model, SILERO_URL)
+        # Determine model path and ensure model file exists (auto-download if missing)
+        from src.model_utils import ensure_model_exists, get_model_info
+        model_name = getattr(args, "model_name", "silero")
+        model_info = get_model_info(model_name)
+        model_path = args.model if args.model else model_info["default_path"]
+        ensure_model_exists(model_name, model_path)
+        args.model = model_path  # Ensure downstream code uses the resolved path
     except SystemExit as e:
         # If running under pytest, re-raise as RuntimeError for test compatibility
         if "pytest" in sys.modules:

@@ -23,39 +23,72 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
     pip install -r requirements.txt
     ```
     > **Note:** PyTorch (`torch`) is required for model inference.
-    > Only PyTorch models (`.pth`) are supported. ONNX and ONNX Runtime are **not** supported.
-    >
-    > **Model Auto-Download:** On first run, if no model file is found in the `models/` directory, the application will automatically attempt to download the pre-trained Silero Denoiser model from a public GitHub release. The model will be saved to `models/silero-denoiser.jit` by default.
-    >
-    > **If the automatic download fails** (e.g., due to network/firewall issues), you must manually download the model file from:
-    >
-    >   https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit
-    >
-    > and place it at:
-    >
-    >   models/silero-denoiser.jit
-    >
-    > Create the `models/` directory if it does not exist:
-    >
-    >   mkdir -p models
-    >   mv denoiser.jit models/silero-denoiser.jit
-    >
-    > The application will detect the model file on the next run.
+    > Only PyTorch models (`.pth`, `.jit`, `.ckpt`) are supported. ONNX and ONNX Runtime are **not** supported.
 
-    - **Platform-specific requirements for Virtual Microphone:**
-      - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
-      - On first use, you may be prompted for admin/system permissions to install a virtual audio device or system extension.
-      - No manual installation of third-party tools is required; all components are bundled or installed programmatically.
-      - **Linux is not currently supported for the virtual microphone.**
+4. **Select and download a pre-trained model:**
+    - By default, the application will use the **Silero Denoiser** model and auto-download it if missing.
+    - You can select an alternative model using the `--model-name` argument (see below).
+    - To use a custom model file, provide the `--model` argument with the path to your model.
 
-4. **Run the application:**
+---
+
+## 🎤 Supported Pre-trained Models
+
+| Model Name         | CLI Value           | Download Link                                                                 | Default Path                   | Notes                                      |
+|--------------------|--------------------|-------------------------------------------------------------------------------|--------------------------------|--------------------------------------------|
+| Silero Denoiser    | `silero`           | [Silero Denoiser (.jit)](https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit) | `models/silero-denoiser.jit`   | Fast, robust, widely used                  |
+| Facebook Denoiser  | `facebook-denoiser`| [Facebook Denoiser (.pth)](https://dl.fbaipublicfiles.com/denoiser/denoiser.pth) | `models/facebook-denoiser.pth` | Official Facebook Denoiser                 |
+| DCUNet (SpeechBrain)| `dcunet`          | [DCUNet 16kHz (.ckpt)](https://github.com/speechbrain/speechbrain/releases/download/v0.5.12/dc_unet_16kHz_pretrained.ckpt) | `models/dcunet-16khz.ckpt`     | From SpeechBrain, for speech enhancement   |
+
+- The model will be auto-downloaded to the default path on first run if not present.
+- To use a different model, specify `--model-name` (see below).
+- To use a custom model file, specify `--model /path/to/model`.
+
+---
+
+## 🛠️ Model Selection & Usage
+
+- **Default (Silero):**
+  ```bash
+  python -m src.main
+  ```
+- **Select Facebook Denoiser:**
+  ```bash
+  python -m src.main --model-name facebook-denoiser
+  ```
+- **Select DCUNet:**
+  ```bash
+  python -m src.main --model-name dcunet
+  ```
+- **Use a custom model file:**
+  ```bash
+  python -m src.main --model /path/to/your_model.pth
+  ```
+
+- The application will attempt to auto-download the selected model if it is missing.
+- If the automatic download fails (e.g., due to network/firewall issues), manually download the model from the link above and place it at the default path (or your custom path).
+
+  Example for Silero:
+  ```bash
+  mkdir -p models
+  wget https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit -O models/silero-denoiser.jit
+  ```
+
+---
+
+- **Platform-specific requirements for Virtual Microphone:**
+  - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
+  - On first use, you may be prompted for admin/system permissions to install a virtual audio device or system extension.
+  - No manual installation of third-party tools is required; all components are bundled or installed programmatically.
+  - **Linux is not currently supported for the virtual microphone.**
+
+5. **Run the application:**
    - **GUI:**
      You can run the GUI application in either of the following ways:
      - As a module (recommended, ensures correct imports):
        ```bash
        python -m src.main
        ```
-       > On first run, if the model file is missing, it will be downloaded automatically to `models/silero-denoiser.pth`.
      - Or, by setting the `PYTHONPATH` so Python treats `src/` as a package:
        ```bash
        PYTHONPATH=. python src/main.py
@@ -66,13 +99,12 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
      python src/denoiser.py --input noisy.wav --output clean.wav
      ```
 
-5. **Run tests:**
+6. **Run tests:**
    ```bash
    pytest tests/
    ```
 
 ---
-
 
 ## 📦 Installation
 

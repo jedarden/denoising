@@ -1,3 +1,10 @@
+import pytest
+
+@pytest.fixture(autouse=True)
+def patch_ensure_model_exists(monkeypatch):
+    # Patch ensure_model_exists to a no-op to avoid real downloads in integration tests
+    import src.model_utils
+    monkeypatch.setattr(src.model_utils, "ensure_model_exists", lambda *a, **kw: None)
 """
 Test suite for main.py
 

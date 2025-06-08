@@ -8,38 +8,71 @@ Utilities for model selection and quantization.
 
 Author: aiGI Auto-Coder
 """
-
 import logging
 import os
 import urllib.request
 
-def ensure_model_exists(model_path: str, url: str = None) -> None:
+# Registry of supported models with their download URLs and default paths
+MODEL_REGISTRY = {
+    "silero": {
+        "display_name": "Silero Denoiser",
+        "default_path": "models/silero-denoiser.jit",
+        "url": "https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit",
+        "format": ".jit",
+        "notes": "Fast, robust, and widely used for speech denoising."
+    },
+    "facebook-denoiser": {
+        "display_name": "Facebook Denoiser",
+        "default_path": "models/facebook-denoiser.pth",
+        "url": "https://dl.fbaipublicfiles.com/denoiser/denoiser.pth",
+        "format": ".pth",
+        "notes": "Official Facebook Denoiser model. See https://github.com/facebookresearch/denoiser"
+    },
+    "dcunet": {
+        "display_name": "DCUNet (SpeechBrain)",
+        "default_path": "models/dcunet-16khz.ckpt",
+        "url": "https://github.com/speechbrain/speechbrain/releases/download/v0.5.12/dc_unet_16kHz_pretrained.ckpt",
+        "format": ".ckpt",
+        "notes": "DCUNet model from SpeechBrain. See https://github.com/speechbrain/speechbrain"
+    }
+}
+
+def get_model_info(model_name: str):
+    """Return model info dict for a given model name."""
+    if model_name not in MODEL_REGISTRY:
+        raise ValueError(f"Unsupported model: {model_name}. Supported: {list(MODEL_REGISTRY.keys())}")
+    return MODEL_REGISTRY[model_name]
+
+def ensure_model_exists(model_name: str, model_path: str = None, url: str = None) -> None:
     """
     Ensure the denoising model file exists at model_path.
     If missing, attempt to download it from a public URL.
     If all automated downloads fail, provide a clear error message with manual download instructions.
 
     Args:
-        model_path (str): Path to the model file.
+        model_name (str): Name of the model in MODEL_REGISTRY.
+        model_path (str, optional): Path to the model file. If None, uses the default path from registry.
         url (str, optional): URL to download the model from. If None, uses the default public link.
 
     Raises:
         RuntimeError: If download fails and manual download is required.
     """
-    # Default public download link for Silero Denoiser (GitHub release, .jit format)
-    DEFAULT_URL = "https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit"
-    MANUAL_URL = DEFAULT_URL
+    info = get_model_info(model_name)
+    model_path = model_path or info["default_path"]
+    download_url = url or info["url"]
+    display_name = info["display_name"]
+
     MANUAL_INSTRUCTIONS = (
         f"\n\n"
-        f"Automatic download of the Silero Denoiser model failed.\n"
+        f"Automatic download of the {display_name} model failed.\n"
         f"To proceed, please manually download the model file from:\n"
-        f"  {MANUAL_URL}\n"
+        f"  {download_url}\n"
         f"and place it at:\n"
         f"  {os.path.abspath(model_path)}\n"
         f"Create the directory if it does not exist.\n"
         f"Example:\n"
         f"  mkdir -p {os.path.dirname(os.path.abspath(model_path))}\n"
-        f"  mv denoiser.jit {os.path.abspath(model_path)}\n"
+        f"  mv <downloaded_file> {os.path.abspath(model_path)}\n"
     )
 
     if os.path.exists(model_path):
@@ -47,7 +80,6 @@ def ensure_model_exists(model_path: str, url: str = None) -> None:
         return
 
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    download_url = url if url is not None else DEFAULT_URL
     logging.info(f"Model file not found at {model_path}. Attempting download from {download_url} ...")
     try:
         urllib.request.urlretrieve(download_url, model_path)
