@@ -25,7 +25,22 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
     > **Note:** PyTorch (`torch`) is required for model inference.
     > Only PyTorch models (`.pth`) are supported. ONNX and ONNX Runtime are **not** supported.
     >
-    > **Model Auto-Download:** On first run, if no model file is found in the `models/` directory, the application will automatically download the pre-trained Silero Denoiser model from HuggingFace. The model will be saved to `models/silero-denoiser.pth` by default. **No manual model download is required for the default configuration.**
+    > **Model Auto-Download:** On first run, if no model file is found in the `models/` directory, the application will automatically attempt to download the pre-trained Silero Denoiser model from a public GitHub release. The model will be saved to `models/silero-denoiser.jit` by default.
+    >
+    > **If the automatic download fails** (e.g., due to network/firewall issues), you must manually download the model file from:
+    >
+    >   https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit
+    >
+    > and place it at:
+    >
+    >   models/silero-denoiser.jit
+    >
+    > Create the `models/` directory if it does not exist:
+    >
+    >   mkdir -p models
+    >   mv denoiser.jit models/silero-denoiser.jit
+    >
+    > The application will detect the model file on the next run.
 
     - **Platform-specific requirements for Virtual Microphone:**
       - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.

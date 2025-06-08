@@ -13,29 +13,52 @@ import logging
 import os
 import urllib.request
 
-def ensure_model_exists(model_path: str, url: str) -> None:
+def ensure_model_exists(model_path: str, url: str = None) -> None:
     """
     Ensure the denoising model file exists at model_path.
-    If missing, download it from the given URL.
+    If missing, attempt to download it from a public URL.
+    If all automated downloads fail, provide a clear error message with manual download instructions.
 
     Args:
         model_path (str): Path to the model file.
-        url (str): URL to download the model from.
+        url (str, optional): URL to download the model from. If None, uses the default public link.
 
     Raises:
-        RuntimeError: If download fails.
+        RuntimeError: If download fails and manual download is required.
     """
+    # Default public download link for Silero Denoiser (GitHub release, .jit format)
+    DEFAULT_URL = "https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit"
+    MANUAL_URL = DEFAULT_URL
+    MANUAL_INSTRUCTIONS = (
+        f"\n\n"
+        f"Automatic download of the Silero Denoiser model failed.\n"
+        f"To proceed, please manually download the model file from:\n"
+        f"  {MANUAL_URL}\n"
+        f"and place it at:\n"
+        f"  {os.path.abspath(model_path)}\n"
+        f"Create the directory if it does not exist.\n"
+        f"Example:\n"
+        f"  mkdir -p {os.path.dirname(os.path.abspath(model_path))}\n"
+        f"  mv denoiser.jit {os.path.abspath(model_path)}\n"
+    )
+
     if os.path.exists(model_path):
         logging.info(f"Model file found: {model_path}")
         return
+
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    logging.info(f"Model file not found at {model_path}. Downloading from {url} ...")
+    download_url = url if url is not None else DEFAULT_URL
+    logging.info(f"Model file not found at {model_path}. Attempting download from {download_url} ...")
     try:
-        urllib.request.urlretrieve(url, model_path)
+        urllib.request.urlretrieve(download_url, model_path)
         logging.info(f"Model downloaded and saved to {model_path}")
     except Exception as e:
         logging.error(f"Failed to download model: {e}")
-        raise RuntimeError(f"Failed to download model: {e}")
+        raise RuntimeError(
+            f"Failed to download model from {download_url}.\n"
+            f"Error: {e}\n"
+            f"{MANUAL_INSTRUCTIONS}"
+        )
 from typing import Any
 
 try:
