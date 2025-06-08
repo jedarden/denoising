@@ -218,9 +218,18 @@ pip install PyQt5 PyAudio numpy
 
 ### Running the Application
 
-```sh
-python main.py --model model.onnx --backend onnx --sample-rate 16000 --buffer-ms 20 --channels 1
-```
+You can run the application in either of the following ways:
+
+- As a module (recommended, ensures correct imports):
+  ```sh
+  python -m src.main --model model.onnx --backend onnx --sample-rate 16000 --buffer-ms 20 --channels 1
+  ```
+- Or, by setting the `PYTHONPATH` so Python treats `src/` as a package:
+  ```sh
+  PYTHONPATH=. python src/main.py --model model.onnx --backend onnx --sample-rate 16000 --buffer-ms 20 --channels 1
+  ```
+
+> **Note:** Directly running `python src/main.py` without setting `PYTHONPATH` will result in an import error due to Python's package import rules. Using the `-m` flag or setting `PYTHONPATH` ensures absolute imports work correctly.
 
 ### Running Tests
 

@@ -25,9 +25,16 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 
 4. **Run the application:**
    - **GUI:**
-     ```bash
-     python src/main.py
-     ```
+     You can run the GUI application in either of the following ways:
+     - As a module (recommended, ensures correct imports):
+       ```bash
+       python -m src.main
+       ```
+     - Or, by setting the `PYTHONPATH` so Python treats `src/` as a package:
+       ```bash
+       PYTHONPATH=. python src/main.py
+       ```
+     > **Note:** Directly running `python src/main.py` without setting `PYTHONPATH` will result in an import error due to Python's package import rules. Using the `-m` flag or setting `PYTHONPATH` ensures absolute imports work correctly.
     - **Command-line (example):**
      ```bash
      python src/denoiser.py --input noisy.wav --output clean.wav
