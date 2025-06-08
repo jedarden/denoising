@@ -29,13 +29,16 @@ class DenoisingInference:
     Loads and runs efficient, CPU-only denoising models (PyTorch only).
     """
 
-    def __init__(self, model_path: str, min_input_length: int = 64):
+    def __init__(self, model_path: str, min_input_length: int = 64, force_min_input_length: int = None):
         """
         Initialize the denoising model.
 
         Args:
             model_path (str): Path to the PyTorch model file.
             min_input_length (int): Minimum input length required for the model (for padding).
+            force_min_input_length (int, optional): If set, strictly enforce this minimum input length
+                when the model's required ReflectionPad1d padding cannot be determined programmatically.
+                If None, falls back to min_input_length.
         """
         if not isinstance(model_path, str):
             raise TypeError("model_path must be a string.")
@@ -45,6 +48,7 @@ class DenoisingInference:
         self.device = "cpu"
         self.loaded = False
         self.min_input_length = min_input_length
+        self.force_min_input_length = force_min_input_length
         self.required_pad_sum = 0  # Will be set after model load
     def load_model(self):
         """
@@ -137,7 +141,15 @@ class DenoisingInference:
                 f"Input audio buffer too short for ReflectionPad1d (len={len(audio_buffer)} <= pad_sum={self.required_pad_sum}). "
                 f"Padded with zeros to {min_required} samples to avoid ReflectionPad1d error."
             )
-        # 3. If input is short but can be padded (legacy min_input_length logic)
+        # 3. If model's required_pad_sum is not determined, strictly enforce force_min_input_length if set
+        elif self.required_pad_sum == 0 and self.force_min_input_length is not None and len(audio_buffer) < self.force_min_input_length:
+            pad_len = self.force_min_input_length - len(audio_buffer)
+            audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
+            logging.warning(
+                f"Model's ReflectionPad1d padding could not be determined. Input audio buffer too short (len={len(audio_buffer)-pad_len}), "
+                f"padded with zeros to force_min_input_length={self.force_min_input_length} samples."
+            )
+        # 4. If input is short but can be padded (legacy min_input_length logic)
         elif len(audio_buffer) < self.min_input_length:
             pad_len = self.min_input_length - len(audio_buffer)
             if len(audio_buffer) > 1:

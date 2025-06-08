@@ -154,3 +154,44 @@ def test_integration_with_audioio_and_denoiser():
     app = gui.DenoisingApp(DummyAudioIO(), DummyDenoiser())
     assert hasattr(app, "audio_io")
     assert hasattr(app, "denoiser")
+def test_visualizer_updates_on_audio(monkeypatch):
+    """
+    Test that the real-time audio visualizer updates both input and output waveforms
+    in the GUI when audio is processed (dummy mode).
+    """
+    import numpy as np
+    import src.gui as gui_mod
+
+    # Use dummy audio_io and denoiser
+    class DummyAudioIO:
+        def start_stream(self, callback):
+            # Simulate a short audio buffer
+            audio = (np.arange(16) / 16.0 * 2 - 1).astype(np.float32)
+            in_data = (audio * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+            callback(in_data)
+            return True
+        def stop_stream(self): return True
+        def enumerate_devices(self): return [{"id": 0, "name": "Dummy"}]
+        def select_device(self, device_id): return True
+
+    class DummyDenoiser:
+        def process_buffer(self, audio):
+            # Return a simple transformation for output
+            return audio * 0.5, False
+
+    # Force dummy widgets/plots
+    monkeypatch.setattr(gui_mod, "QtWidgets", None)
+    monkeypatch.setattr(gui_mod, "pg", None)
+
+    app = gui_mod.DenoisingApp(DummyAudioIO(), DummyDenoiser())
+    # Simulate starting denoising (should update plots)
+    app.audio_io.start_stream(lambda in_data: app.start_denoising())
+
+    # The dummy plot widgets should have .data set
+    assert hasattr(app.input_waveform_plot, "data")
+    assert hasattr(app.output_waveform_plot, "data")
+    # The input plot should have the last audio buffer
+    assert app.input_waveform_plot.data is not None
+    assert app.output_waveform_plot.data is not None
+    # Output should be half the input
+    np.testing.assert_allclose(app.output_waveform_plot.data, app.input_waveform_plot.data * 0.5, rtol=1e-5)

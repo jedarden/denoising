@@ -19,6 +19,32 @@ except ImportError:
     QtWidgets = None
     QtCore = None
 
+# Try to import pyqtgraph for waveform visualization
+try:
+    import pyqtgraph as pg
+except ImportError:
+    pg = None
+
+# Dummy plot widget for headless/test environments
+class _DummyPlotWidget:
+    def __init__(self, *a, **k):
+        self.data = None
+        self.title = ""
+    def plot(self, *a, **k):
+        self.data = a[0] if a else None
+    def clear(self):
+        self.data = None
+    def setTitle(self, title):
+        self.title = title
+    def setYRange(self, *a, **k):
+        pass
+    def setXRange(self, *a, **k):
+        pass
+    def setLabel(self, *a, **k):
+        pass
+    def getPlotItem(self):
+        return self
+
 # Dummy widget classes for headless/mock environments
 class _DummyWidget:
     """
@@ -102,7 +128,6 @@ class DenoisingApp(_BaseMainWindow):
         self.audio_io = audio_io
         self.denoiser = denoiser
         self.device_list = []
-        # Use real widgets if QtWidgets is available, else dummy widgets
         if QtWidgets and hasattr(QtWidgets, "QLabel"):
             self.device_label = QtWidgets.QLabel("Input Device:", self)
             self.device_combo = QtWidgets.QComboBox(self)
@@ -112,6 +137,15 @@ class DenoisingApp(_BaseMainWindow):
             self.start_button = QtWidgets.QPushButton("Start", self)
             self.stop_button = QtWidgets.QPushButton("Stop", self)
             self.status_label = QtWidgets.QLabel("Status: Idle", self)
+            # Add waveform plot widgets using pyqtgraph if available
+            if pg is not None:
+                self.input_waveform_plot = pg.PlotWidget(title="Noisy Input")
+                self.output_waveform_plot = pg.PlotWidget(title="Denoised Output")
+                self.input_waveform_plot.setYRange(-1, 1)
+                self.output_waveform_plot.setYRange(-1, 1)
+            else:
+                self.input_waveform_plot = _DummyPlotWidget()
+                self.output_waveform_plot = _DummyPlotWidget()
         else:
             self.device_label = _DummyWidget()
             self.device_combo = _DummyWidget()
@@ -121,6 +155,9 @@ class DenoisingApp(_BaseMainWindow):
             self.start_button = _DummyWidget()
             self.stop_button = _DummyWidget()
             self.status_label = _DummyWidget()
+            self.input_waveform_plot = _DummyPlotWidget()
+            self.output_waveform_plot = _DummyPlotWidget()
+        self.init_ui()
         self.init_ui()
 
     def init_ui(self):
@@ -146,6 +183,9 @@ class DenoisingApp(_BaseMainWindow):
             layout.addWidget(self.stop_button)
             layout.addWidget(self.status_label)
 
+            # Add waveform plots to the layout
+            layout.addWidget(self.input_waveform_plot)
+            layout.addWidget(self.output_waveform_plot)
             central_widget = QtWidgets.QWidget(self)
             central_widget.setLayout(layout)
             if hasattr(self, "setCentralWidget"):
@@ -209,6 +249,33 @@ class DenoisingApp(_BaseMainWindow):
                     processed, bypassed = self.denoiser.process_buffer(audio)
                 else:
                     processed = audio
+
+                # Update waveform plots (in GUI thread if possible)
+                if pg is not None and QtCore is not None:
+                    def update_plots():
+                        self.input_waveform_plot.clear()
+                        self.input_waveform_plot.plot(audio, pen='r')
+                        self.output_waveform_plot.clear()
+                        self.output_waveform_plot.plot(processed, pen='g')
+                    QtCore.QMetaObject.invokeMethod(
+                        self.input_waveform_plot, "clear", QtCore.Qt.QueuedConnection
+                    )
+                    QtCore.QMetaObject.invokeMethod(
+                        self.input_waveform_plot, "plot", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(object, audio), QtCore.Q_ARG(object, 'r')
+                    )
+                    QtCore.QMetaObject.invokeMethod(
+                        self.output_waveform_plot, "clear", QtCore.Qt.QueuedConnection
+                    )
+                    QtCore.QMetaObject.invokeMethod(
+                        self.output_waveform_plot, "plot", QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(object, processed), QtCore.Q_ARG(object, 'g')
+                    )
+                else:
+                    # Fallback for dummy/test: just store data
+                    self.input_waveform_plot.plot(audio)
+                    self.output_waveform_plot.plot(processed)
+
                 out_data = (processed * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
                 if denoise_on and bypassed:
                     self.update_status("Denoising bypassed: input too short, raw audio used")

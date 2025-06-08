@@ -157,3 +157,68 @@ def test_reflectionpad1d_padding_prevents_error(monkeypatch):
     output3, bypassed3 = instance.process_buffer(long_input)
     assert output3.shape[0] == 12
     assert not bypassed3
+def test_no_reflectionpad1d_error_on_edge_cases(monkeypatch):
+    """
+    Test that DenoisingInference never triggers a ReflectionPad1d error,
+    even for edge-case buffer sizes, by simulating a model with ReflectionPad1d.
+    """
+    import numpy as np
+    import types
+
+    # Simulate a model with ReflectionPad1d(padding=8)
+    class DummyReflectionPad1d:
+        def __init__(self, padding):
+            self.padding = padding
+
+    class DummyModel:
+        def __init__(self):
+            self._modules = [DummyReflectionPad1d(8)]
+        def modules(self):
+            return self._modules
+        def eval(self): pass
+
+    # Patch load_pytorch_model to return DummyModel
+    monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModel())
+
+    # Create DenoisingInference with min_input_length < required_pad_sum
+    min_input_length = 4
+    instance = denoiser.DenoisingInference("mock_model.pth", min_input_length=min_input_length)
+    instance.load_model()
+
+    # Patch process_buffer to bypass actual torch/noise logic
+    monkeypatch.setattr(instance, "model", DummyModel())
+    instance.loaded = True
+
+    # Try a range of edge-case buffer sizes
+    for buf_len in [0, 1, 8, 15, 16, 20]:
+        audio = np.ones(buf_len, dtype=np.float32)
+        try:
+            out, bypassed = instance.process_buffer(audio)
+            assert isinstance(out, np.ndarray)
+            # Output should be at least required_pad_sum+1 or min_input_length
+            assert len(out) >= max(min_input_length, instance.required_pad_sum + 1)
+        except Exception as e:
+            pytest.fail(f"ReflectionPad1d error or unexpected exception for buf_len={buf_len}: {e}")
+
+def test_force_min_input_length_enforced(monkeypatch):
+    """
+    Test that force_min_input_length is strictly enforced if model padding cannot be determined.
+    """
+    import numpy as np
+
+    class DummyModelNoPad:
+        def modules(self): return []
+        def eval(self): pass
+
+    monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModelNoPad())
+
+    force_min = 32
+    instance = denoiser.DenoisingInference("mock_model.pth", min_input_length=4, force_min_input_length=force_min)
+    instance.load_model()
+    instance.loaded = True
+
+    # Try a short buffer
+    audio = np.ones(5, dtype=np.float32)
+    out, bypassed = instance.process_buffer(audio)
+    assert isinstance(out, np.ndarray)
+    assert len(out) >= force_min
