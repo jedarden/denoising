@@ -194,3 +194,35 @@ def test_absolute_imports_resolve():
             importlib.import_module(mod)
         except ImportError as e:
             raise AssertionError(f"Failed to import {mod}: {e}")
+def test_denoiser_init_no_backend(tmp_path):
+    """
+    Test that DenoisingInference can be initialized without a backend argument.
+    """
+    import sys
+    sys.path.insert(0, str(tmp_path.parent / "src"))
+    from src.denoiser import DenoisingInference
+    # Create a dummy model file
+    model_path = tmp_path / "dummy_model.pth"
+    model_path.write_text("dummy")
+    # Patch torch to avoid actual loading
+    import types
+    import builtins
+    import importlib
+    import sys as _sys
+
+    class DummyTorch:
+        def load(self, path, map_location=None):
+            class DummyModel:
+                def eval(self): return None
+            return DummyModel()
+    dummy_torch = DummyTorch()
+    sys_modules_backup = dict(_sys.modules)
+    _sys.modules["torch"] = dummy_torch
+    try:
+        denoiser = DenoisingInference(str(model_path))
+        assert denoiser.model_path == str(model_path)
+        # Should not raise on load_model
+        denoiser.load_model()
+    finally:
+        _sys.modules.clear()
+        _sys.modules.update(sys_modules_backup)

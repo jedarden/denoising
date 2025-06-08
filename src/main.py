@@ -173,7 +173,7 @@ def main():
             os._exit(1)
 
     try:
-        denoiser = DenoisingInference(model_path=args.model, backend=args.backend)
+        denoiser = DenoisingInference(model_path=args.model)
         denoiser.load_model()
     except Exception as e:
         logging.error(f"Failed to initialize Denoiser: {e}")
