@@ -23,9 +23,9 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
     pip install -r requirements.txt
     ```
     > **Note:** PyTorch (`torch`) is required for model inference.
-    > All models must be in PyTorch format (`.pth`). ONNX and ONNX Runtime are no longer supported.
+    > Only PyTorch models (`.pth`) are supported. ONNX and ONNX Runtime are **not** supported.
     >
-    > **New in v1.1:** If no model file is found in the `models/` directory, the application will automatically download a pre-trained Silero Denoiser model from the official source (HuggingFace) on first run. No manual download is required for the default model.
+    > **Model Auto-Download:** On first run, if no model file is found in the `models/` directory, the application will automatically download the pre-trained Silero Denoiser model from HuggingFace. The model will be saved to `models/silero-denoiser.pth` by default. **No manual model download is required for the default configuration.**
 
     - **Platform-specific requirements for Virtual Microphone:**
       - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
@@ -58,96 +58,6 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 
 ---
 
-## 🧩 ONNX Runtime: Installation & Troubleshooting
-
-ONNX Runtime (`onnxruntime`) is required for model inference.
-Below are detailed, platform-specific instructions for installing, verifying, and troubleshooting ONNX Runtime on **Windows** and **macOS**.
-
-### Installation via pip
-
-#### Windows
-
-1. **Open Command Prompt** (or PowerShell) in your virtual environment.
-2. Run:
-   ```bash
-   pip install onnxruntime
-   ```
-   - For GPU support (NVIDIA CUDA), use:
-     ```bash
-     pip install onnxruntime-gpu
-     ```
-   - Ensure your Python version is 3.8 or newer.
-
-#### macOS
-
-1. **Open Terminal** in your virtual environment.
-2. Run:
-   ```bash
-   pip install onnxruntime
-   ```
-   - For Apple Silicon (M1/M2), you may use:
-     ```bash
-     pip install onnxruntime-silicon
-     ```
-   - For Intel Macs, use the standard `onnxruntime` package.
-
-> **Tip:** If you see permission errors, always use a virtual environment. Avoid using `sudo pip install`.
-
----
-
-### Verifying Installation
-
-After installation, verify ONNX Runtime is installed and working:
-
-```bash
-python -c "import onnxruntime; print('ONNX Runtime version:', onnxruntime.__version__)"
-```
-
-- If you see the version number (e.g., `ONNX Runtime version: 1.18.0`), the installation is successful.
-- If you see an error, see troubleshooting below.
-
----
-
-### Troubleshooting Common Issues
-
-#### 1. **pip install fails with build errors or missing wheels**
-
-- **Check Python version:** ONNX Runtime requires Python 3.8+.
-- **Upgrade pip:**
-  ```bash
-  pip install --upgrade pip
-  ```
-- **Check platform compatibility:**
-  - On Apple Silicon, use `onnxruntime-silicon`.
-  - On Windows, ensure you are using a supported Python version (3.8+).
-
-#### 2. **ImportError: No module named 'onnxruntime'**
-
-- Ensure you installed ONNX Runtime in the correct environment.
-- Activate your virtual environment:
-  - **Windows:** `.\.venv\Scripts\activate`
-  - **macOS:** `source .venv/bin/activate`
-- Reinstall ONNX Runtime if needed.
-
-#### 3. **DLL load failed (Windows) or Library not loaded (macOS)**
-
-- **Windows:** Ensure your Python and ONNX Runtime architectures match (both 64-bit).
-- **macOS:** For Apple Silicon, use `onnxruntime-silicon`. For Intel, use standard `onnxruntime`.
-
-#### 4. **General tips**
-
-- Always use a virtual environment.
-- If issues persist, uninstall and reinstall:
-  ```bash
-  pip uninstall onnxruntime onnxruntime-gpu onnxruntime-silicon
-  pip install onnxruntime  # or onnxruntime-gpu / onnxruntime-silicon as needed
-  ```
-
-#### 5. **More help**
-
-- See the [official ONNX Runtime installation guide](https://onnxruntime.ai/docs/build/) for advanced troubleshooting.
-
----
 
 ## 📦 Installation
 
@@ -158,6 +68,8 @@ python -c "import onnxruntime; print('ONNX Runtime version:', onnxruntime.__vers
   ```bash
   pip install pytest coverage mypy flake8
   ```
+- **PyTorch is required for all model inference. Only `.pth` models are supported.**
+- **No manual model download is required for the default configuration. The Silero Denoiser model will be auto-downloaded to `models/silero-denoiser.pth` on first run if not present.**
 
 ---
 
@@ -165,9 +77,10 @@ python -c "import onnxruntime; print('ONNX Runtime version:', onnxruntime.__vers
 
 ### GUI
 
-- Launch with `python src/main.py`
+- Launch with `python -m src.main` (recommended) or set `PYTHONPATH=. python src/main.py`
 - Intuitive interface for loading, denoising, and saving audio files
 - Visualize waveforms and denoising results
+- **On first run, the Silero Denoiser model will be auto-downloaded to `models/silero-denoiser.pth` if not already present.**
 
 ### Command-Line
 
@@ -175,6 +88,7 @@ python -c "import onnxruntime; print('ONNX Runtime version:', onnxruntime.__vers
   ```bash
   python src/denoiser.py --input noisy.wav --output clean.wav
   ```
+  - The model will be auto-downloaded if missing.
 - See all options:
   ```bash
   python src/denoiser.py --help
@@ -222,14 +136,9 @@ mypy src/
 
 ## 🧪 Troubleshooting
 
-- **Import errors:** Ensure your virtual environment is activated and all dependencies (including `onnxruntime`) are installed.
-- **ONNX Runtime not found:**
-  If you see errors like `ModuleNotFoundError: No module named 'onnxruntime'`, run:
-  ```bash
-  pip install onnxruntime
-  ```
-  For platform-specific wheels or issues, see the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/build/).
-
+- **Import errors:** Ensure your virtual environment is activated and all dependencies are installed.
+- **Model not found:** If you see errors about a missing model file, ensure you have internet access on first run so the Silero Denoiser model can be auto-downloaded. The model will be saved to `models/silero-denoiser.pth` by default.
+- **PyTorch not installed:** If you see `ModuleNotFoundError: No module named 'torch'`, install PyTorch with `pip install torch`.
 - **"VirtualMicrophoneService is not defined" or NotImplementedError:**
   - This error occurs if you attempt to use the Virtual Microphone feature on an unsupported platform (e.g., Linux) or if the backend is not yet implemented for your OS.
   - The Virtual Microphone is only available on Windows 10+ and macOS 12+.
