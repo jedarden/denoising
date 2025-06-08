@@ -30,10 +30,10 @@ def ensure_virtual_microphone_deps():
     # For now, just a placeholder for future dependency checks
     return True
 
-from audio_io import AudioIO
-from denoiser import DenoisingInference
-from gui import DenoisingApp
-from virtual_microphone import VirtualMicrophoneService
+from src.audio_io import AudioIO
+from src.denoiser import DenoisingInference
+from src.gui import DenoisingApp
+from src.virtual_microphone import VirtualMicrophoneService
 
 # --- Model Auto-Download URL ---
 SILERO_URL = "https://huggingface.co/snakers4/silero-denoiser/resolve/main/denoiser.pth"

@@ -147,3 +147,24 @@ def test_startup_continues_if_env_issues_resolved(monkeypatch, caplog):
         main.main()
     assert any("Temporary environment issue" in m for m in caplog.messages)
     assert any("Environment issue resolved" in m or "Continuing startup" in m for m in caplog.messages)
+import sys
+import subprocess
+import pytest
+
+@pytest.mark.skipif(sys.version_info < (3, 6), reason="Requires Python 3.6+")
+def test_module_run_no_import_error():
+    """
+    Test that running 'python -m src.main' does not raise ImportError.
+    This is a smoke test for absolute import correctness.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "src.main", "--help"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        timeout=10
+    )
+    # Accept exit code 0 or 1 (help may cause exit 0/1 depending on argparse)
+    assert result.returncode in (0, 1), f"Non-zero exit: {result.returncode}\nSTDERR:\n{result.stderr}"
+    assert "ImportError" not in result.stderr, f"ImportError in stderr:\n{result.stderr}"
+    assert "ModuleNotFoundError" not in result.stderr, f"ModuleNotFoundError in stderr:\n{result.stderr}"
