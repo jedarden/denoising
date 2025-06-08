@@ -37,7 +37,7 @@ def test_denoisinginference_signature_and_docstring():
 def test_model_loading_unloading(monkeypatch):
     """Test model loading and unloading (mocked for CPU-only)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.pth")
+    instance = cls("mock_model.pth", min_input_length=1)
     monkeypatch.setattr(instance, "load_model", lambda: True)
     monkeypatch.setattr(instance, "unload_model", lambda: True)
     assert instance.load_model() is True
@@ -46,7 +46,7 @@ def test_model_loading_unloading(monkeypatch):
 def test_denoising_inference_logic(monkeypatch):
     """Test denoising inference logic (input/output checks, mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.pth")
+    instance = cls("mock_model.pth", min_input_length=1)
     # Mock inference method
     monkeypatch.setattr(instance, "infer", lambda x: [0.0 for _ in x])
     input_data = [0.1, 0.2, 0.3]
@@ -110,7 +110,7 @@ def test_error_handling_model_not_found(monkeypatch):
 def test_error_handling_invalid_input(monkeypatch):
     """Test error handling for invalid input (mocked)."""
     cls = denoiser.DenoisingInference
-    instance = cls("mock_model.pth")
+    instance = cls("mock_model.pth", min_input_length=1)
     monkeypatch.setattr(instance, "process_buffer", lambda x: (_ for _ in ()).throw(ValueError("Invalid input")))
     with pytest.raises(ValueError):
         instance.process_buffer(None)
@@ -119,3 +119,41 @@ def test_input_validation(monkeypatch):
     """Test that invalid input types/values are rejected with clear errors (mocked)."""
     cls = denoiser.DenoisingInference
     # Backend selection is no longer supported; this test is obsolete.
+def test_reflectionpad1d_padding_prevents_error(monkeypatch):
+    """
+    Test that process_buffer pads input with zeros if input length <= required_pad_sum,
+    preventing ReflectionPad1d errors for the shortest possible input.
+    """
+    import numpy as np
+    cls = denoiser.DenoisingInference
+    instance = cls("mock_model.pth", min_input_length=1)
+    # Simulate a model with ReflectionPad1d(padding=(5,5)), so required_pad_sum=10
+    instance.required_pad_sum = 10
+    instance.loaded = True
+
+    # Mock model: just returns input tensor as output (simulate identity model)
+    class DummyModel:
+        def __call__(self, x):
+            return x
+
+    instance.model = DummyModel()
+
+    # Input shorter than or equal to required_pad_sum
+    short_input = np.array([0.1] * 5, dtype=np.float32)  # length 5 <= 10
+    output, bypassed = instance.process_buffer(short_input)
+    # Should be padded to required_pad_sum+1 = 11
+    assert isinstance(output, np.ndarray)
+    assert output.shape[0] == 11
+    assert not bypassed  # Should not bypass, should pad and run
+
+    # Input exactly required_pad_sum
+    exact_input = np.array([0.2] * 10, dtype=np.float32)
+    output2, bypassed2 = instance.process_buffer(exact_input)
+    assert output2.shape[0] == 11
+    assert not bypassed2
+
+    # Input longer than required_pad_sum
+    long_input = np.array([0.3] * 12, dtype=np.float32)
+    output3, bypassed3 = instance.process_buffer(long_input)
+    assert output3.shape[0] == 12
+    assert not bypassed3

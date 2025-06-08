@@ -45,7 +45,7 @@ class DenoisingInference:
         self.device = "cpu"
         self.loaded = False
         self.min_input_length = min_input_length
-
+        self.required_pad_sum = 0  # Will be set after model load
     def load_model(self):
         """
         Load the denoising model from file.
@@ -61,10 +61,28 @@ class DenoisingInference:
             self.model = load_pytorch_model(self.model_path, logger=logging)
             self.model.eval()
             self.loaded = True
+            # Scan for ReflectionPad1d layers and compute required_pad_sum
+            self.required_pad_sum = 0
+            if hasattr(self.model, "modules"):
+                try:
+                    for m in self.model.modules():
+                        if hasattr(torch.nn, "ReflectionPad1d") and isinstance(m, torch.nn.ReflectionPad1d):
+                            pad = m.padding
+                            # pad can be int or tuple
+                            if isinstance(pad, int):
+                                pad_sum = pad * 2
+                            elif isinstance(pad, (tuple, list)):
+                                pad_sum = sum(pad)
+                            else:
+                                pad_sum = 0
+                            if pad_sum > self.required_pad_sum:
+                                self.required_pad_sum = pad_sum
+                except Exception as e:
+                    logging.warning(f"Could not determine ReflectionPad1d padding: {e}")
+            logging.info(f"Model loaded. Required ReflectionPad1d pad sum: {self.required_pad_sum}")
         except Exception as e:
             logging.error(f"Failed to load PyTorch model: {e}")
             raise RuntimeError(f"Failed to load PyTorch model: {e}")
-
     def quantize_model(self):
         """
         Quantize the model for CPU efficiency (if supported).
@@ -106,14 +124,21 @@ class DenoisingInference:
         if torch is None:
             logging.error("PyTorch is not installed.")
             raise ImportError("PyTorch is not installed.")
-
-        # Hardened input validation: If input is too short to pad safely, bypass denoising
+        # 1. If extremely short, bypass and return raw audio (legacy behavior)
         if len(audio_buffer) < 2:
             logging.warning(f"Input audio buffer too short to pad safely (len={len(audio_buffer)}). Denoising bypassed, returning raw audio.")
             return audio_buffer, True
-
-        # If input is short but can be padded, pad to min_input_length
-        if len(audio_buffer) < self.min_input_length:
+        # 2. If input is too short for ReflectionPad1d, pad to max(min_input_length, required_pad_sum+1)
+        elif self.required_pad_sum > 0 and len(audio_buffer) <= self.required_pad_sum:
+            min_required = max(self.min_input_length, self.required_pad_sum + 1)
+            pad_len = min_required - len(audio_buffer)
+            audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="constant")
+            logging.warning(
+                f"Input audio buffer too short for ReflectionPad1d (len={len(audio_buffer)} <= pad_sum={self.required_pad_sum}). "
+                f"Padded with zeros to {min_required} samples to avoid ReflectionPad1d error."
+            )
+        # 3. If input is short but can be padded (legacy min_input_length logic)
+        elif len(audio_buffer) < self.min_input_length:
             pad_len = self.min_input_length - len(audio_buffer)
             if len(audio_buffer) > 1:
                 audio_buffer = np.pad(audio_buffer, (0, pad_len), mode="reflect")
@@ -129,8 +154,6 @@ class DenoisingInference:
         except Exception as e:
             logging.error(f"PyTorch inference failed: {e}")
             raise RuntimeError(f"PyTorch inference failed: {e} (input length: {len(audio_buffer)})")
-
-    def is_quantized(self) -> bool:
         """
         Check if the model is quantized.
 
