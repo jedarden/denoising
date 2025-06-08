@@ -26,16 +26,16 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 4. **Run the application:**
    - **GUI:**
      ```bash
-     python main.py
+     python src/main.py
      ```
-   - **Command-line (example):**
+    - **Command-line (example):**
      ```bash
-     python denoiser.py --input noisy.wav --output clean.wav
+     python src/denoiser.py --input noisy.wav --output clean.wav
      ```
 
 5. **Run tests:**
    ```bash
-   pytest
+   pytest tests/
    ```
 
 ---
@@ -56,7 +56,7 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 
 ### GUI
 
-- Launch with `python main.py`
+- Launch with `python src/main.py`
 - Intuitive interface for loading, denoising, and saving audio files
 - Visualize waveforms and denoising results
 
@@ -64,11 +64,11 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 
 - Denoise audio:
   ```bash
-  python denoiser.py --input noisy.wav --output clean.wav
+  python src/denoiser.py --input noisy.wav --output clean.wav
   ```
 - See all options:
   ```bash
-  python denoiser.py --help
+  python src/denoiser.py --help
   ```
 
 ---
@@ -83,29 +83,31 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
 ### Running Tests
 
 ```bash
-pytest
-coverage run -m pytest
+pytest tests/
+coverage run -m pytest tests/
 coverage report
 ```
 
 ### Linting & Type Checking
 
 ```bash
-flake8 .
-mypy .
+flake8 src/ tests/
+mypy src/
 ```
 
 ---
 
 ## 🧩 Project Structure
 
-- `main.py` — Application entry point (GUI)
-- `denoiser.py` — Core denoising logic
-- `audio_io.py` — Audio file I/O utilities
-- `model_utils.py` — Model loading and utility functions
-- `gui.py` — GUI components
-- `test_*.py` — Unit tests for each module
+- `src/main.py` — Application entry point (GUI)
+- `src/denoiser.py` — Core denoising logic
+- `src/audio_io.py` — Audio file I/O utilities
+- `src/model_utils.py` — Model loading and utility functions
+- `src/gui.py` — GUI components
+- `src/virtual_microphone.py` — Virtual Microphone feature
+- `tests/` — Unit tests for each module (e.g., `tests/test_denoiser.py`)
 - `research/` — Reference papers and supporting materials
+- `docs/` — Specifications, prompts, and documentation
 
 ---
 
@@ -159,7 +161,7 @@ The Denoising Toolkit now supports a **Virtual Microphone** feature, allowing de
 
 1. **Run the application as usual:**
    ```bash
-   python main.py
+   python src/main.py
    ```
 2. **Select the virtual microphone in your target app's audio settings.**
 3. **Denoised audio will be routed automatically.**
