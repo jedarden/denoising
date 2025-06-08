@@ -16,6 +16,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pytest
 import src.model_utils as model_utils
+import torch
+import torch.nn as nn
 
 def test_select_model_supported(monkeypatch):
     """Test model selection for supported models (mocked)."""
@@ -80,3 +82,33 @@ def test_ensure_model_exists_present(monkeypatch, tmp_path):
     for model_name in model_utils.MODEL_REGISTRY:
         model_utils.ensure_model_exists(model_name, "dummy_path")
     assert "fail" not in called
+import tempfile
+class DummyModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(2, 2)
+    def forward(self, x):
+        return self.linear(x)
+
+@pytest.mark.parametrize("save_type", ["torchscript", "state_dict"])
+def test_load_pytorch_model_handles_torchscript_and_statedict(save_type):
+    """
+    Test that load_pytorch_model can load both TorchScript archives and state_dict model files.
+    """
+    model = DummyModel()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_path = os.path.join(tmpdir, f"dummy_model_{save_type}.pt")
+        if save_type == "torchscript":
+            scripted = torch.jit.script(model)
+            scripted.save(model_path)
+        else:
+            # Save as a full model archive (not just state_dict)
+            torch.save(model, model_path)
+        loaded = model_utils.load_pytorch_model(model_path)
+        assert isinstance(loaded, nn.Module)
+        # For torchscript, loaded is a ScriptModule; for state_dict, it's DummyModel
+        if save_type == "torchscript":
+            assert hasattr(loaded, "forward")
+        else:
+            assert type(loaded) == DummyModel
+            assert hasattr(loaded, "forward")

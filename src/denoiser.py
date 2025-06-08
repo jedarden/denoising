@@ -22,7 +22,7 @@ try:
 except ImportError:
     torch = None
 
-from src.model_utils import select_model, quantize_model
+from src.model_utils import select_model, quantize_model, load_pytorch_model
 
 class DenoisingInference:
     """
@@ -56,7 +56,7 @@ class DenoisingInference:
             logging.error(f"PyTorch model file not found: {self.model_path}")
             raise FileNotFoundError(f"PyTorch model file not found: {self.model_path}")
         try:
-            self.model = torch.load(self.model_path, map_location="cpu")
+            self.model = load_pytorch_model(self.model_path, logger=logging)
             self.model.eval()
             self.loaded = True
         except Exception as e:

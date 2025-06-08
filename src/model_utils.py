@@ -217,8 +217,84 @@ def select_model(name: str) -> Any:
                 x = self.relu1(x)
                 x = self.conv2(x)
                 x = self.relu2(x)
-                x = self.conv3(x)
-                return x
+def load_pytorch_model(model_path: str, logger=logging) -> "torch.nn.Module":
+    """
+    Load a PyTorch model from file, handling both TorchScript archives and state_dict files.
+
+    - Uses torch.jit.load for TorchScript archives (.jit, .pt, .pth if archive).
+    - Uses torch.load for state_dict files (with weights_only=False if available).
+    - Provides clear error messages and warnings for ambiguous or incompatible files.
+
+    Args:
+        model_path (str): Path to the model file.
+        logger: Logger for warnings/errors.
+
+    Returns:
+        torch.nn.Module: Loaded model.
+
+    Raises:
+        RuntimeError: If the model cannot be loaded or is incompatible.
+    """
+    if torch is None:
+        logger.error("PyTorch is not installed.")
+        raise ImportError("PyTorch is not installed.")
+    if not os.path.exists(model_path):
+        logger.error(f"PyTorch model file not found: {model_path}")
+        raise FileNotFoundError(f"PyTorch model file not found: {model_path}")
+
+    # Heuristic: TorchScript archives are usually .jit, sometimes .pt/.pth
+    ext = os.path.splitext(model_path)[1].lower()
+    is_torchscript_ext = ext in [".jit"]
+    ambiguous_ext = ext in [".pt", ".pth"]
+
+    # Try TorchScript load if extension matches or ambiguous
+    if is_torchscript_ext or ambiguous_ext:
+        try:
+            model = torch.jit.load(model_path, map_location="cpu")
+            logger.info(f"Loaded TorchScript archive: {model_path}")
+            return model
+        except Exception as e:
+            if is_torchscript_ext:
+                logger.error(f"Failed to load TorchScript archive: {e}")
+                raise RuntimeError(
+                    f"Failed to load TorchScript archive '{model_path}': {e}\n"
+                    "Ensure the file is a valid TorchScript model exported with torch.jit.save."
+                )
+            # If ambiguous, fall through to try state_dict
+            logger.warning(
+                f"File '{model_path}' could not be loaded as TorchScript archive: {e}. "
+                "Attempting to load as state_dict."
+            )
+
+    # Try loading as state_dict (PyTorch 2.6+ supports weights_only)
+    try:
+        import inspect
+        if "weights_only" in inspect.signature(torch.load).parameters:
+            obj = torch.load(model_path, map_location="cpu", weights_only=False)
+        else:
+            obj = torch.load(model_path, map_location="cpu")
+        if isinstance(obj, torch.nn.Module):
+            logger.info(f"Loaded PyTorch model (state_dict archive): {model_path}")
+            return obj
+        elif isinstance(obj, dict):
+            logger.error("Loaded object is a state_dict, not a torch.nn.Module. "
+                         "Instantiate the model class and use model.load_state_dict().")
+            raise RuntimeError(
+                f"File '{model_path}' is a state_dict, not a full model archive. "
+                "Instantiate the correct model class and use model.load_state_dict(torch.load(...))."
+            )
+        else:
+            logger.error("Loaded object is not a torch.nn.Module or state_dict.")
+            raise RuntimeError(
+                f"File '{model_path}' is not a valid model archive or state_dict."
+            )
+    except Exception as e:
+        logger.error(f"Failed to load PyTorch model: {e}")
+        raise RuntimeError(
+            f"Failed to load PyTorch model '{model_path}': {e}\n"
+            "If this is a TorchScript archive, ensure it was saved with torch.jit.save. "
+            "If this is a state_dict, ensure you are using the correct model class."
+        )
 
         return SpeechDenoiser()
         class DummySpeechDenoiser(nn.Module):
