@@ -18,10 +18,17 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
    source .venv/bin/activate
    ```
 
-3. **Install dependencies:**
+3. **Install all dependencies (including ONNX Runtime):**
    ```bash
    pip install -r requirements.txt
    ```
+   > **Note:** ONNX Runtime (`onnxruntime`) is required for model inference. If you encounter issues installing it, refer to the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/build/).
+
+   - **Platform-specific requirements for Virtual Microphone:**
+     - The Virtual Microphone feature is only supported on **Windows 10+** and **macOS 12+**.
+     - On first use, you may be prompted for admin/system permissions to install a virtual audio device or system extension.
+     - No manual installation of third-party tools is required; all components are bundled or installed programmatically.
+     - **Linux is not currently supported for the virtual microphone.**
 
 4. **Run the application:**
    - **GUI:**
@@ -35,7 +42,7 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
        PYTHONPATH=. python src/main.py
        ```
      > **Note:** Directly running `python src/main.py` without setting `PYTHONPATH` will result in an import error due to Python's package import rules. Using the `-m` flag or setting `PYTHONPATH` ensures absolute imports work correctly.
-    - **Command-line (example):**
+   - **Command-line (example):**
      ```bash
      python src/denoiser.py --input noisy.wav --output clean.wav
      ```
@@ -120,7 +127,19 @@ mypy src/
 
 ## 🧪 Troubleshooting
 
-- **Import errors:** Ensure your virtual environment is activated and dependencies are installed.
+- **Import errors:** Ensure your virtual environment is activated and all dependencies (including `onnxruntime`) are installed.
+- **ONNX Runtime not found:**
+  If you see errors like `ModuleNotFoundError: No module named 'onnxruntime'`, run:
+  ```bash
+  pip install onnxruntime
+  ```
+  For platform-specific wheels or issues, see the [ONNX Runtime installation guide](https://onnxruntime.ai/docs/build/).
+
+- **"VirtualMicrophoneService is not defined" or NotImplementedError:**
+  - This error occurs if you attempt to use the Virtual Microphone feature on an unsupported platform (e.g., Linux) or if the backend is not yet implemented for your OS.
+  - The Virtual Microphone is only available on Windows 10+ and macOS 12+.
+  - If you see `NotImplementedError: Virtual microphone is only supported on Windows and macOS.` or `NotImplementedError: <platform> virtual microphone backend not yet implemented.`, this is expected on unsupported platforms or while the feature is in beta.
+
 - **Audio file issues:** Supported formats are WAV/PCM. For others, convert using `ffmpeg`.
 - **GUI not launching:** Check for missing GUI dependencies (e.g., PyQt5, Tkinter).
 - **Test failures:** Run `pytest -v` for detailed output. Check for missing test dependencies.
@@ -150,17 +169,17 @@ See the `research/` directory for foundational papers and inspiration. Contribut
 
 ## 🎤 Virtual Microphone Feature (Beta)
 
-The Denoising Toolkit now supports a **Virtual Microphone** feature, allowing denoised audio to be routed to a system-level virtual audio input device. This enables you to use denoised audio in real-time with third-party applications (e.g., Zoom, Teams, Discord).
+The Denoising Toolkit includes a **Virtual Microphone** feature, allowing denoised audio to be routed to a system-level virtual audio input device. This enables you to use denoised audio in real-time with third-party applications (e.g., Zoom, Teams, Discord).
 
 ### Supported Platforms
 
 - **Windows 10+** (user-mode virtual audio device, no manual driver install required)
 - **macOS 12+** (CoreAudio virtual device, no manual third-party tools required)
-- *Linux support coming soon*
+- **Linux is not supported** (feature will raise `NotImplementedError`)
 
 ### How It Works
 
-- When you run the GUI or main application, a virtual microphone device is created and registered with your OS.
+- When you run the GUI or main application, a virtual microphone device is created and registered with your OS (if supported).
 - Denoised audio is streamed to this device in real time.
 - In your communication app, select "Denoising Virtual Microphone" (or similar) as your input device.
 
@@ -185,10 +204,12 @@ The Denoising Toolkit now supports a **Virtual Microphone** feature, allowing de
   - Restart your system if prompted after installation.
   - Check the application logs for errors related to the virtual microphone.
 - If you encounter issues, disable the feature by running with the `--no-virtual-mic` flag (if available).
+- If you see `NotImplementedError` related to the virtual microphone, check your OS support (see above).
 
 ### Limitations
 
 - The feature is in beta; some advanced audio routing scenarios may not be supported.
 - Only one instance of the virtual microphone is supported at a time.
+- The backend implementation for Windows and macOS is in progress; you may see `NotImplementedError` until full support is released.
 
 ---
