@@ -272,7 +272,13 @@ class DenoisingApp(_BaseMainWindow):
                 self.update_status("Error: Stream not started")
             else:
                 # Only update status if not already set to a bypass message
-                if not hasattr(self.status_label, "text") or "bypassed" not in getattr(self.status_label, "text", "").lower():
+                # Safely get the text from the status label, handling both callable and attribute cases
+                status_text = getattr(self.status_label, "text", "")
+                if callable(status_text):
+                    status_text = status_text()
+                if not isinstance(status_text, str):
+                    status_text = str(status_text)
+                if not hasattr(self.status_label, "text") or "bypassed" not in status_text.lower():
                     self.update_status("Denoising started (A/B toggle: {})".format(
                         "On" if (self.denoise_checkbox.isChecked() if hasattr(self.denoise_checkbox, "isChecked") else getattr(self.denoise_checkbox, "checked", True)) else "Off"
                     ))

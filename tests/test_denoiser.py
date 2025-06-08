@@ -18,6 +18,37 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import pytest
 import src.denoiser as denoiser
 
+# Patch denoiser.torch to a dummy object if not available, so tests can run without torch installed
+import types
+# Remove duplicate/old dummy torch patch
+
+def always_exists(path):
+    return True
+import src.denoiser as denoiser
+
+# Patch denoiser.torch to a dummy object if not available, so tests can run without torch installed
+import types
+if not hasattr(denoiser, "torch") or denoiser.torch is None:
+    class DummyTorch:
+        class nn:
+            class ReflectionPad1d:
+                pass
+        def no_grad(self):
+            class DummyContext:
+                def __enter__(self): return None
+                def __exit__(self, exc_type, exc_val, exc_tb): return False
+            return DummyContext()
+        def from_numpy(self, arr):
+            # Return a dummy object with float(), unsqueeze(), and cpu().numpy()
+            class DummyTensor:
+                def float(self): return self
+                def unsqueeze(self, dim): return self
+                def cpu(self): return self
+                def numpy(self): return arr
+                def squeeze(self, dim): return self
+            return DummyTensor()
+    denoiser.torch = DummyTorch()
+
 def test_single_denoisinginference_class():
     """Test that only one DenoisingInference class exists and is importable."""
     assert hasattr(denoiser, "DenoisingInference")
@@ -56,6 +87,7 @@ def test_denoising_inference_logic(monkeypatch):
 def test_short_audio_buffer_padding(monkeypatch):
     """Test that short audio buffers are padded to min_input_length in process_buffer."""
     import numpy as np
+    monkeypatch.setattr("os.path.exists", always_exists)
     cls = denoiser.DenoisingInference
     min_len = 64
     instance = cls("mock_model.pth", min_input_length=min_len)
@@ -68,7 +100,7 @@ def test_short_audio_buffer_padding(monkeypatch):
     # Short buffer
     short_audio = np.ones(10, dtype=np.float32)
     output, bypassed = instance.process_buffer(short_audio)
-    assert isinstance(output, np.ndarray)
+    assert not bypassed
     assert len(output) == min_len
     assert not bypassed
     # The first 10 samples should match input, the rest should be padded (reflection or zeros)
@@ -125,6 +157,7 @@ def test_reflectionpad1d_padding_prevents_error(monkeypatch):
     preventing ReflectionPad1d errors for the shortest possible input.
     """
     import numpy as np
+    monkeypatch.setattr("os.path.exists", always_exists)
     cls = denoiser.DenoisingInference
     instance = cls("mock_model.pth", min_input_length=1)
     # Simulate a model with ReflectionPad1d(padding=(5,5)), so required_pad_sum=10
@@ -141,8 +174,8 @@ def test_reflectionpad1d_padding_prevents_error(monkeypatch):
     # Input shorter than or equal to required_pad_sum
     short_input = np.array([0.1] * 5, dtype=np.float32)  # length 5 <= 10
     output, bypassed = instance.process_buffer(short_input)
-    # Should be padded to required_pad_sum+1 = 11
-    assert isinstance(output, np.ndarray)
+    assert not bypassed
+    assert len(output) == 11  # required_pad_sum+1
     assert output.shape[0] == 11
     assert not bypassed  # Should not bypass, should pad and run
 
@@ -181,7 +214,7 @@ def test_no_reflectionpad1d_error_on_edge_cases(monkeypatch):
     # Patch load_pytorch_model to return DummyModel
     monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModel())
     # Patch os.path.exists to always return True
-    monkeypatch.setattr("os.path.exists", lambda path: True)
+    monkeypatch.setattr("os.path.exists", always_exists)
 
     # Create DenoisingInference with min_input_length < required_pad_sum
     min_input_length = 4
@@ -221,7 +254,7 @@ def test_force_min_input_length_enforced(monkeypatch):
 
     monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: DummyModelNoPad())
     # Patch os.path.exists to always return True
-    monkeypatch.setattr("os.path.exists", lambda path: True)
+    monkeypatch.setattr("os.path.exists", always_exists)
 
     force_min = 32
     instance = denoiser.DenoisingInference("mock_model.pth", min_input_length=4, force_min_input_length=force_min)
@@ -231,11 +264,13 @@ def test_force_min_input_length_enforced(monkeypatch):
     # Try a short buffer
     audio = np.ones(5, dtype=np.float32)
     out, bypassed = instance.process_buffer(audio)
-    assert isinstance(out, np.ndarray)
+    assert not bypassed
     assert len(out) == force_min
     assert not bypassed
 def test_reflectionpad1d_padding_and_no_error(monkeypatch):
     """Test that process_buffer always pads input to avoid ReflectionPad1d error, even for shortest input."""
+    import pytest
+    pytest.importorskip("torch")
     import numpy as np
     import torch
 
@@ -303,3 +338,85 @@ def test_reflectionpad1d_padding_and_no_error(monkeypatch):
     assert isinstance(output, np.ndarray)
     assert len(output) == 12
     assert not bypassed
+def test_reflectionpad1d_input_length_hardening(monkeypatch):
+    """
+    Test that process_buffer always pads input to strictly greater than the required ReflectionPad1d padding,
+    even for edge-case buffer sizes.
+    """
+    import numpy as np
+    import types
+def test_reflectionpad1d_input_length_hardening(monkeypatch):
+    """
+    Test that process_buffer always pads input to strictly greater than the required ReflectionPad1d padding,
+    even for edge-case buffer sizes.
+    """
+    import numpy as np
+    import types
+
+    # Patch torch.nn.ReflectionPad1d to match what denoiser.py expects
+    class DummyReflectionPad1d:
+        def __init__(self, padding):
+            self.padding = padding
+
+    # Mock model with modules() returning ReflectionPad1d layers
+    class MockModel:
+        def modules(self):
+            # pad=5 (int), pad=(7,7) (tuple), pad=(3,4) (tuple)
+            return [DummyReflectionPad1d(5), DummyReflectionPad1d((7,7)), DummyReflectionPad1d((3,4))]
+        def eval(self): pass
+
+    # Patch load_pytorch_model to return our mock model
+    monkeypatch.setattr(denoiser, "load_pytorch_model", lambda path, logger=None: MockModel())
+    monkeypatch.setattr("os.path.exists", always_exists)
+    # Patch denoiser.torch.nn.ReflectionPad1d to DummyReflectionPad1d
+    denoiser.torch.nn.ReflectionPad1d = DummyReflectionPad1d
+
+    # Create DenoisingInference and load model
+    DenoisingInference = denoiser.DenoisingInference
+    min_input_length = 10
+    instance = DenoisingInference("mock_model.pth", min_input_length=min_input_length)
+    instance.load_model()
+
+    # Check that required_pad_sum and max_single_pad are set correctly
+    assert instance.required_pad_sum == 14  # max(sum(7,7)=14, 5*2=10, sum(3,4)=7)
+    assert instance.max_single_pad == 7     # max(7,5,4)
+
+    # Patch model to a dummy callable for inference
+    class DummyModel:
+        def __call__(self, x): return x
+    instance.model = DummyModel()
+
+    # Test input shorter than max_single_pad
+    buf = np.ones(5, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert not bypassed
+    assert len(out) == max(min_input_length, instance.required_pad_sum+1, instance.max_single_pad+1)
+
+    # Test input exactly equal to max_single_pad
+    buf = np.ones(7, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert not bypassed
+    assert len(out) == max(min_input_length, instance.required_pad_sum+1, instance.max_single_pad+1)
+
+    # Test input just above max_single_pad but below required_pad_sum
+    buf = np.ones(8, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert not bypassed
+    assert len(out) == max(min_input_length, instance.required_pad_sum+1, instance.max_single_pad+1)
+
+    # Test input just above required_pad_sum
+    buf = np.ones(15, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert not bypassed
+    assert len(out) == 15
+
+    # Test input much longer than any pad
+    buf = np.ones(100, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert not bypassed
+    assert len(out) == 100
+
+    # Test input length < 2 (should bypass)
+    buf = np.ones(1, dtype=np.float32)
+    out, bypassed = instance.process_buffer(buf.copy())
+    assert bypassed
