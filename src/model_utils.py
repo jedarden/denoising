@@ -17,23 +17,35 @@ MODEL_REGISTRY = {
     "silero": {
         "display_name": "Silero Denoiser",
         "default_path": "models/silero-denoiser.jit",
-        "url": "https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit",
+        "url": None,
         "format": ".jit",
-        "notes": "Fast, robust, and widely used for speech denoising."
+        "notes": (
+            "Fast, robust, and widely used for speech denoising. "
+            "Automatic download is currently unavailable. "
+            "Manual download required. See: https://github.com/snakers4/silero-models"
+        )
     },
     "facebook-denoiser": {
         "display_name": "Facebook Denoiser",
         "default_path": "models/facebook-denoiser.pth",
-        "url": "https://dl.fbaipublicfiles.com/denoiser/denoiser.pth",
+        "url": None,
         "format": ".pth",
-        "notes": "Official Facebook Denoiser model. See https://github.com/facebookresearch/denoiser"
+        "notes": (
+            "Official Facebook Denoiser model. "
+            "Automatic download is currently unavailable. "
+            "Manual download required. See: https://github.com/facebookresearch/denoiser"
+        )
     },
     "dcunet": {
         "display_name": "DCUNet (SpeechBrain)",
         "default_path": "models/dcunet-16khz.ckpt",
-        "url": "https://github.com/speechbrain/speechbrain/releases/download/v0.5.12/dc_unet_16kHz_pretrained.ckpt",
+        "url": None,
         "format": ".ckpt",
-        "notes": "DCUNet model from SpeechBrain. See https://github.com/speechbrain/speechbrain"
+        "notes": (
+            "DCUNet model from SpeechBrain. "
+            "Automatic download is currently unavailable. "
+            "Manual download required. See: https://github.com/speechbrain/speechbrain"
+        )
     }
 }
 
@@ -61,13 +73,14 @@ def ensure_model_exists(model_name: str, model_path: str = None, url: str = None
     model_path = model_path or info["default_path"]
     download_url = url or info["url"]
     display_name = info["display_name"]
+    notes = info.get("notes", "")
 
     MANUAL_INSTRUCTIONS = (
         f"\n\n"
-        f"Automatic download of the {display_name} model failed.\n"
-        f"To proceed, please manually download the model file from:\n"
-        f"  {download_url}\n"
-        f"and place it at:\n"
+        f"Automatic download of the {display_name} model is not available.\n"
+        f"To proceed, please manually download the model file as described below:\n"
+        f"{notes}\n"
+        f"Place the downloaded file at:\n"
         f"  {os.path.abspath(model_path)}\n"
         f"Create the directory if it does not exist.\n"
         f"Example:\n"
@@ -77,6 +90,23 @@ def ensure_model_exists(model_name: str, model_path: str = None, url: str = None
 
     if os.path.exists(model_path):
         logging.info(f"Model file found: {model_path}")
+        return
+
+    if download_url is None:
+        raise RuntimeError(MANUAL_INSTRUCTIONS)
+
+    # If a URL is provided (future-proofing), attempt download
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    logging.info(f"Model file not found at {model_path}. Attempting download from {download_url} ...")
+    try:
+        urllib.request.urlretrieve(download_url, model_path)
+        logging.info(f"Model downloaded and saved to {model_path}")
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to download model from {download_url}.\n"
+            f"Error: {e}\n"
+            f"{MANUAL_INSTRUCTIONS}"
+        )
         return
 
     os.makedirs(os.path.dirname(model_path), exist_ok=True)

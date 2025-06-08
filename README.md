@@ -26,18 +26,24 @@ A modular, research-driven Python toolkit for audio denoising, featuring a cross
     > Only PyTorch models (`.pth`, `.jit`, `.ckpt`) are supported. ONNX and ONNX Runtime are **not** supported.
 
 4. **Select and download a pre-trained model:**
-    - By default, the application will use the **Silero Denoiser** model and auto-download it if missing.
-    - You can select an alternative model using the `--model-name` argument (see below).
+    - **Manual download required:** All supported models must be downloaded manually from their official repositories (see table below).
+    - Place the downloaded model file in the appropriate path (see "Default Path" in the table below).
+    - You can select a model using the `--model-name` argument (see below).
     - To use a custom model file, provide the `--model` argument with the path to your model.
 
 ---
 
 ## 🎤 Supported Pre-trained Models
 
-| Model Name         | CLI Value           | Download Link                                                                 | Default Path                   | Notes                                      |
+> **Note:**
+> All supported models must be downloaded manually from their official repositories.
+> Place the downloaded file at the path shown in the "Default Path" column.
+
+| Model Name         | CLI Value           | Repository Link                                                               | Default Path                   | Notes                                      |
 |--------------------|--------------------|-------------------------------------------------------------------------------|--------------------------------|--------------------------------------------|
-| Silero Denoiser    | `silero`           | [Silero Denoiser (.jit)](https://github.com/snakers4/silero-models/releases/download/v0.4.0/denoiser.jit) | `models/silero-denoiser.jit`   | Fast, robust, widely used                  |
-| Facebook Denoiser  | `facebook-denoiser`| [Facebook Denoiser (.pth)](https://dl.fbaipublicfiles.com/denoiser/denoiser.pth) | `models/facebook-denoiser.pth` | Official Facebook Denoiser                 |
+| Silero Denoiser    | `silero`           | [Silero Denoiser Repository](https://github.com/snakers4/silero-models)       | `models/silero-denoiser.jit`   | Fast, robust, widely used. Download `.jit` model manually. |
+| Facebook Denoiser  | `facebook-denoiser`| [Facebook Denoiser Repository](https://github.com/facebookresearch/denoiser)  | `models/facebook-denoiser.pth` | Official Facebook Denoiser. Download `.pth` model manually. |
+| DCUNet (SpeechBrain) | `dcunet`         | [SpeechBrain Repository](https://github.com/speechbrain/speechbrain)          | `models/dcunet-16khz.ckpt`     | DCUNet model from SpeechBrain. Download `.ckpt` model manually. |
 | DCUNet (SpeechBrain)| `dcunet`          | [DCUNet 16kHz (.ckpt)](https://github.com/speechbrain/speechbrain/releases/download/v0.5.12/dc_unet_16kHz_pretrained.ckpt) | `models/dcunet-16khz.ckpt`     | From SpeechBrain, for speech enhancement   |
 
 - The model will be auto-downloaded to the default path on first run if not present.
